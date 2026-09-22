@@ -1,2 +1,134 @@
-<!-- frontend/register.html -->
-<!-- TODO: Register page (Customer / Restaurant Owner) -->
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng ký tài khoản — Restaurant Booking</title>
+    <meta name="description" content="Đăng ký tài khoản khách hàng hoặc đối tác nhà hàng để đặt bàn và quản lý đặt chỗ dễ dàng.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <div class="page">
+        <header class="header">
+            <a class="logo" href="index.html">
+                <span class="logo-mark" aria-hidden="true">🍽</span>
+                <span>Restaurant Booking</span>
+            </a>
+            <nav class="nav-menu">
+                <a href="index.html" class="btn-ghost">Trang chủ</a>
+                <a href="login.html" class="btn-ghost">Đăng nhập</a>
+            </nav>
+        </header>
+
+        <main class="auth-wrapper">
+            <section class="auth-card register-card" aria-labelledby="register-title">
+                <p class="hero-eyebrow">Khởi đầu trải nghiệm</p>
+                <h1 id="register-title">Đăng ký tài khoản</h1>
+                <p class="auth-lead">Chọn vai trò phù hợp để bắt đầu đặt bàn hoặc quản lý cơ sở nhà hàng của bạn.</p>
+
+                <!-- Role Selector Tabs -->
+                <div class="role-selector" role="tablist" aria-label="Chọn loại tài khoản">
+                    <button type="button"
+                            id="role-btn-customer"
+                            class="role-option active"
+                            role="tab"
+                            aria-selected="true"
+                            data-role="CUSTOMER">
+                        <span class="role-icon" aria-hidden="true">👤</span>
+                        <span class="role-text">
+                            <strong>Khách hàng</strong>
+                            <small>Tìm kiếm &amp; đặt bàn tiện lợi</small>
+                        </span>
+                    </button>
+                    <button type="button"
+                            id="role-btn-owner"
+                            class="role-option"
+                            role="tab"
+                            aria-selected="false"
+                            data-role="RESTAURANT_OWNER">
+                        <span class="role-icon" aria-hidden="true">🏪</span>
+                        <span class="role-text">
+                            <strong>Chủ nhà hàng</strong>
+                            <small>Quản lý chi nhánh &amp; nhận khách</small>
+                        </span>
+                    </button>
+                </div>
+
+                <div id="register-error" class="form-alert" hidden role="alert"></div>
+                <div id="register-success" class="form-alert alert-success" hidden role="status"></div>
+
+                <form id="register-form" novalidate>
+                    <!-- Hidden input for selected role -->
+                    <input type="hidden" id="selected-role" name="role" value="CUSTOMER">
+
+                    <!-- Common fields -->
+                    <div class="form-group">
+                        <label for="name">Họ và tên <span class="required-mark">*</span></label>
+                        <input id="name" name="name" type="text" autocomplete="name" required placeholder="Nguyễn Văn A">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email">Email <span class="required-mark">*</span></label>
+                        <input id="email" name="email" type="email" autocomplete="email" required placeholder="ban@email.com">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">Mật khẩu <span class="required-mark">*</span></label>
+                        <div class="password-field">
+                            <input id="password" name="password" type="password" autocomplete="new-password" required placeholder="Tối thiểu 6 ký tự" minlength="6">
+                            <button type="button" id="btn-toggle-password" class="btn-text" aria-pressed="false">Hiện</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="confirm-password">Xác nhận mật khẩu <span class="required-mark">*</span></label>
+                        <div class="password-field">
+                            <input id="confirm-password" name="confirm-password" type="password" autocomplete="new-password" required placeholder="Nhập lại mật khẩu" minlength="6">
+                            <button type="button" id="btn-toggle-confirm" class="btn-text" aria-pressed="false">Hiện</button>
+                        </div>
+                    </div>
+
+                    <!-- Restaurant specific fields (toggled when role is RESTAURANT_OWNER) -->
+                    <div id="restaurant-fields" class="restaurant-fields" hidden>
+                        <div class="fields-divider">
+                            <span>Thông tin nhà hàng</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="restaurant-name">Tên nhà hàng <span class="required-mark">*</span></label>
+                            <input id="restaurant-name" name="restaurant_name" type="text" placeholder="Ví dụ: Nhà hàng Hương Sen">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="restaurant-email">Email nhà hàng / nhận thông báo</label>
+                            <input id="restaurant-email" name="restaurant_email" type="email" placeholder="contact@huongsen.vn (tùy chọn)">
+                            <small class="field-hint">Dùng để nhận email thông báo khi có khách đặt bàn. Nếu để trống sẽ sử dụng email cá nhân ở trên.</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="restaurant-phone">Số điện thoại liên hệ</label>
+                            <input id="restaurant-phone" name="restaurant_phone" type="tel" placeholder="0901 234 567 (tùy chọn)">
+                        </div>
+                    </div>
+
+                    <button type="submit" id="btn-register" class="btn-primary btn-block">Đăng ký tài khoản</button>
+                </form>
+
+                <p class="auth-footer">
+                    Đã có tài khoản? <a href="login.html">Đăng nhập ngay</a>
+                </p>
+            </section>
+        </main>
+    </div>
+
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/register.js"></script>
+</body>
+
+</html>
