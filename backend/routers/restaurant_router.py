@@ -1,3 +1,10 @@
+"""
+restaurant_router.py
+
+Các API RESTful dành cho RESTAURANT_OWNER quản lý hồ sơ nhà hàng, chi nhánh 
+và xử lý các yêu cầu đặt bàn (xác nhận/từ chối).
+"""
+
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -24,6 +31,21 @@ async def create_restaurant(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
+    """
+    Tạo mới hồ sơ nhà hàng cho tài khoản hiện tại.
+
+    Args:
+        data: Thông tin nhà hàng cần tạo.
+        db: SQLAlchemy session.
+        current_user: Người dùng hiện tại, bắt buộc role = RESTAURANT_OWNER.
+
+    Returns:
+        Đối tượng Restaurant vừa tạo.
+
+    Raises:
+        HTTPException(403): Nếu user không phải RESTAURANT_OWNER.
+        HTTPException(400): Nếu user đã tạo nhà hàng rồi.
+    """
     if current_user.role != models.UserRole.RESTAURANT_OWNER:
         raise HTTPException(status_code=403, detail="Chỉ RESTAURANT_OWNER mới có thể tạo nhà hàng")
     
@@ -42,6 +64,19 @@ async def get_my_restaurant(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
+    """
+    Lấy thông tin nhà hàng của tài khoản hiện tại.
+
+    Args:
+        db: SQLAlchemy session.
+        current_user: Người dùng hiện tại.
+
+    Returns:
+        Đối tượng Restaurant.
+
+    Raises:
+        HTTPException(404): Nếu user chưa có hồ sơ nhà hàng.
+    """
     restaurant = db.query(models.Restaurant).filter(models.Restaurant.owner_id == current_user.id).first()
     if not restaurant:
         raise HTTPException(status_code=404, detail="Chưa có hồ sơ nhà hàng")
@@ -53,6 +88,17 @@ async def update_my_restaurant(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
+    """
+    Cập nhật thông tin hồ sơ nhà hàng.
+
+    Args:
+        data: Thông tin nhà hàng mới.
+        db: SQLAlchemy session.
+        current_user: Người dùng hiện tại.
+
+    Returns:
+        Đối tượng Restaurant sau khi cập nhật.
+    """
     restaurant = db.query(models.Restaurant).filter(models.Restaurant.owner_id == current_user.id).first()
     if not restaurant:
         raise HTTPException(status_code=404, detail="Chưa có hồ sơ nhà hàng")
@@ -69,6 +115,16 @@ async def list_branches(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
+    """
+    Lấy danh sách tất cả chi nhánh thuộc về nhà hàng của người dùng.
+
+    Args:
+        db: SQLAlchemy session.
+        current_user: Người dùng hiện tại.
+
+    Returns:
+        Danh sách các đối tượng Branch.
+    """
     restaurant = db.query(models.Restaurant).filter(models.Restaurant.owner_id == current_user.id).first()
     if not restaurant:
         return []
@@ -80,6 +136,18 @@ async def add_branch(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
+    """
+    Thêm một chi nhánh mới cho nhà hàng.
+    Khởi tạo available_tables bằng total_tables.
+
+    Args:
+        data: Thông tin chi nhánh cần thêm.
+        db: SQLAlchemy session.
+        current_user: Người dùng hiện tại.
+
+    Returns:
+        Đối tượng Branch vừa tạo.
+    """
     restaurant = db.query(models.Restaurant).filter(models.Restaurant.owner_id == current_user.id).first()
     if not restaurant:
         raise HTTPException(status_code=404, detail="Chưa có hồ sơ nhà hàng")
@@ -101,6 +169,19 @@ async def edit_branch(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
+    """
+    Chỉnh sửa thông tin chi nhánh.
+    Nếu thay đổi total_tables, available_tables sẽ được tự động điều chỉnh bù trừ.
+
+    Args:
+        branch_id: ID chi nhánh cần sửa.
+        data: Dữ liệu cần sửa (có thể không truyền toàn bộ trường).
+        db: SQLAlchemy session.
+        current_user: Người dùng hiện tại.
+
+    Returns:
+        Đối tượng Branch đã được sửa.
+    """
     restaurant = db.query(models.Restaurant).filter(models.Restaurant.owner_id == current_user.id).first()
     branch = db.query(models.Branch).filter(models.Branch.id == branch_id, models.Branch.restaurant_id == restaurant.id).first() if restaurant else None
     
@@ -125,6 +206,17 @@ async def delete_branch(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
+    """
+    Xóa một chi nhánh khỏi hệ thống.
+
+    Args:
+        branch_id: ID chi nhánh cần xóa.
+        db: SQLAlchemy session.
+        current_user: Người dùng hiện tại.
+
+    Returns:
+        Thông báo xóa thành công.
+    """
     restaurant = db.query(models.Restaurant).filter(models.Restaurant.owner_id == current_user.id).first()
     branch = db.query(models.Branch).filter(models.Branch.id == branch_id, models.Branch.restaurant_id == restaurant.id).first() if restaurant else None
     
@@ -143,6 +235,19 @@ async def list_reservations(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
+    """
+    Lấy danh sách các đơn đặt bàn gửi đến nhà hàng, có hỗ trợ phân trang và lọc.
+
+    Args:
+        status: (Tùy chọn) Lọc theo trạng thái (PENDING, CONFIRMED, ...).
+        page: Số trang.
+        limit: Số kết quả mỗi trang.
+        db: SQLAlchemy session.
+        current_user: Người dùng hiện tại.
+
+    Returns:
+        Danh sách đơn đặt bàn được sắp xếp mới nhất ở trên.
+    """
     restaurant = db.query(models.Restaurant).filter(models.Restaurant.owner_id == current_user.id).first()
     if not restaurant:
         return []
@@ -160,6 +265,15 @@ async def confirm_res(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
+    """
+    Xác nhận một đơn đặt bàn đang ở trạng thái PENDING.
+    Logic được ủy thác qua hàm mock của Dev 2.
+
+    Args:
+        reservation_id: ID đơn đặt bàn.
+        db: SQLAlchemy session.
+        current_user: Người dùng (chủ nhà hàng).
+    """
     # Using mock until integration
     # Return mocked or handled response 
     res = await confirm_reservation(db, reservation_id, current_user)
@@ -174,6 +288,16 @@ async def reject_res(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
+    """
+    Từ chối một đơn đặt bàn kèm theo lý do bắt buộc.
+    Logic được ủy thác qua hàm mock của Dev 2.
+
+    Args:
+        reservation_id: ID đơn đặt bàn.
+        data: Request body chứa lý do từ chối.
+        db: SQLAlchemy session.
+        current_user: Người dùng hiện tại.
+    """
     if not data.reason:
         raise HTTPException(status_code=422, detail="Lý do từ chối không được để trống")
     res = await reject_reservation(db, reservation_id, data.reason, current_user)

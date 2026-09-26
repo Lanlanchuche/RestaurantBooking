@@ -1,3 +1,11 @@
+"""
+email_service.py
+
+Dịch vụ gửi email thông báo tự động.
+Hỗ trợ gửi email bất đồng bộ thông qua ThreadPoolExecutor và smtplib,
+định dạng HTML email với giao diện dark theme.
+"""
+
 import os
 import smtplib
 from email.mime.text import MIMEText
@@ -14,7 +22,11 @@ SMTP_USER = os.getenv("SMTP_USER")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
 class EmailService:
+    """
+    Lớp cung cấp các tiện ích xử lý và gửi email thông báo.
+    """
     def __init__(self):
+        """Khởi tạo pool thread để gửi email bất đồng bộ không làm block (nghẽn) event loop."""
         self.executor = ThreadPoolExecutor(max_workers=5)
 
     def _base_html(self, title: str, body: str) -> str:
@@ -72,6 +84,14 @@ class EmailService:
         await loop.run_in_executor(self.executor, self._send_sync, to_email, subject, html_content)
 
     async def send_booking_received(self, customer, branch, reservation):
+        """
+        Gửi thông báo có đơn đặt bàn mới (trạng thái PENDING) tới cả khách hàng và nhà hàng.
+
+        Args:
+            customer: Người dùng (khách hàng) thực hiện đặt bàn.
+            branch: Chi nhánh nhà hàng được đặt.
+            reservation: Đơn đặt bàn.
+        """
         subject = f"Đơn đặt bàn mới: {branch.name} - #{reservation.id}"
         
         body_customer = self._base_html(
@@ -98,6 +118,14 @@ class EmailService:
             await self._send(branch.restaurant.email, subject, body_restaurant)
 
     async def send_confirmed(self, customer, branch, reservation):
+        """
+        Gửi thông báo xác nhận đặt bàn thành công tới khách hàng (trạng thái CONFIRMED).
+
+        Args:
+            customer: Người dùng (khách hàng) đặt bàn.
+            branch: Chi nhánh nhà hàng.
+            reservation: Đơn đặt bàn đã được xác nhận.
+        """
         subject = f"Đã xác nhận đặt bàn: {branch.name} - #{reservation.id}"
         body = self._base_html(
             "Đặt bàn của bạn đã được xác nhận",
@@ -111,6 +139,15 @@ class EmailService:
         await self._send(customer.email, subject, body)
 
     async def send_rejected(self, customer, branch, reservation, reason: str):
+        """
+        Gửi thông báo nhà hàng từ chối đặt bàn tới khách hàng (trạng thái REJECTED).
+
+        Args:
+            customer: Người dùng (khách hàng) đặt bàn.
+            branch: Chi nhánh nhà hàng.
+            reservation: Đơn đặt bàn bị từ chối.
+            reason (str): Lý do nhà hàng từ chối.
+        """
         subject = f"Từ chối đặt bàn: {branch.name} - #{reservation.id}"
         body = self._base_html(
             "Đặt bàn của bạn bị từ chối",
@@ -123,6 +160,14 @@ class EmailService:
         await self._send(customer.email, subject, body)
 
     async def send_cancelled(self, customer, branch, reservation):
+        """
+        Gửi thông báo khách hàng hủy đơn tới cả hai bên (trạng thái CANCELLED).
+
+        Args:
+            customer: Người dùng (khách hàng) đã hủy bàn.
+            branch: Chi nhánh nhà hàng.
+            reservation: Đơn đặt bàn bị hủy.
+        """
         subject = f"Đã hủy đặt bàn: {branch.name} - #{reservation.id}"
         body = self._base_html(
             "Đặt bàn đã được hủy",
