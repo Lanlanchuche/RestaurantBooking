@@ -1,2 +1,92 @@
-<!-- frontend/customer/history.html -->
-<!-- TODO: Reservation history table with status badges and cancellation -->
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lịch Sử Đặt Bàn — TableReserve</title>
+    <meta name="description" content="Quản lý và theo dõi lịch sử đặt bàn, trạng thái xác nhận và thực hiện hủy đặt chỗ theo quy tắc 24 giờ.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+
+<body class="app-body">
+    <div class="booking-shell">
+        <!-- Top Navigation Bar -->
+        <header class="booking-top-nav">
+            <div class="booking-top-left">
+                <a href="../index.html" class="logo" title="Trang chủ">
+                    <span class="logo-mark" aria-hidden="true">🍽</span>
+                    <span>Restaurant Booking</span>
+                </a>
+                <a href="dashboard.html" class="btn-back-link">
+                    <span>←</span>
+                    <span>Bảng điều khiển</span>
+                </a>
+            </div>
+
+            <div class="booking-top-right">
+                <a href="book.html" class="btn-primary" style="padding:7px 18px; font-size:0.9rem; text-decoration:none;">
+                    <span>+ Đặt bàn mới</span>
+                </a>
+                <div class="booking-user-badge">
+                    <div id="hist-user-avatar" class="booking-user-avatar">KH</div>
+                    <span id="hist-user-name" class="booking-user-name">Khách hàng</span>
+                </div>
+                <button type="button" id="btn-hist-logout" class="btn-ghost" style="padding:6px 14px; font-size:0.88rem;">Đăng xuất</button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main>
+            <div class="booking-hero-header" style="text-align:left; margin-bottom:24px;">
+                <h1 class="booking-hero-title">Lịch Sử Đặt Bàn</h1>
+                <p class="booking-hero-desc" style="margin:0;">
+                    Theo dõi danh sách các lần đặt bàn, tình trạng phê duyệt từ nhà hàng và thực hiện hủy chỗ khi cần thiết.
+                </p>
+            </div>
+
+            <!-- Stats Bar -->
+            <div class="history-stats-bar">
+                <div class="history-stat-card">
+                    <div id="stat-total" class="history-stat-val">0</div>
+                    <p class="history-stat-label">Tổng lượt đặt</p>
+                </div>
+                <div class="history-stat-card">
+                    <div id="stat-pending" class="history-stat-val" style="color:#b78103;">0</div>
+                    <p class="history-stat-label">Chờ xác nhận</p>
+                </div>
+                <div class="history-stat-card">
+                    <div id="stat-confirmed" class="history-stat-val" style="color:#2e7d32;">0</div>
+                    <p class="history-stat-label">Đã xác nhận</p>
+                </div>
+                <div class="history-stat-card">
+                    <div id="stat-cancelled" class="history-stat-val" style="color:var(--muted);">0</div>
+                    <p class="history-stat-label">Đã hủy / Từ chối</p>
+                </div>
+            </div>
+
+            <!-- Filter Navigation Tabs -->
+            <nav class="history-filter-nav" aria-label="Lọc lịch sử đặt bàn">
+                <button type="button" class="filter-tab-btn active" data-filter="ALL">Tất cả đặt bàn</button>
+                <button type="button" class="filter-tab-btn" data-filter="PENDING">Chờ xác nhận</button>
+                <button type="button" class="filter-tab-btn" data-filter="CONFIRMED">Đã xác nhận</button>
+                <button type="button" class="filter-tab-btn" data-filter="CANCELLED">Đã hủy</button>
+            </nav>
+
+            <!-- Reservations List Container -->
+            <section id="reservations-list-container" aria-label="Danh sách đặt bàn">
+                <!-- Dynamic cards rendered by history.js -->
+            </section>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="../js/auth.js"></script>
+    <script src="../js/api.js"></script>
+    <script src="../js/history.js"></script>
+</body>
+
+</html>

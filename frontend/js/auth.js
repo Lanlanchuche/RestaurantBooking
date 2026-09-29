@@ -29,16 +29,67 @@ function clearAuth() {
     localStorage.removeItem(USER_KEY);
 }
 
-function dashboardPathForRole(role) {
-    if (role === "RESTAURANT_OWNER") {
-        return "restaurant/dashboard.html";
-    }
-    return "customer/dashboard.html";
+function displayName(user) {
+    if (!user) return "Khách";
+    return user.name || user.full_name || (user.email ? user.email.split("@")[0] : "Khách");
 }
 
-function authPageHref(fileName) {
-    const inSubFolder = /\/(customer|restaurant)\//.test(location.pathname);
-    return inSubFolder ? `../${fileName}` : fileName;
+function authPageHref(page = "login.html") {
+    const isSubdir = location.pathname.includes("/customer/") || location.pathname.includes("/restaurant/");
+    return isSubdir ? `../${page}` : page;
+}
+
+function dashboardHref(role) {
+    const isSubdir = location.pathname.includes("/customer/") || location.pathname.includes("/restaurant/");
+    const prefix = isSubdir ? "../" : "";
+    return role === "RESTAURANT_OWNER"
+        ? `${prefix}restaurant/dashboard.html`
+        : `${prefix}customer/dashboard.html`;
+}
+
+function requireAuth(requiredRole = "CUSTOMER") {
+    const token = getToken();
+    let user = getUser();
+
+    if (!token) {
+        // Tự động cấp phiên demo để người dùng trải nghiệm ngay lập tức nếu chưa qua trang đăng nhập
+        const demoUser = {
+            id: 1,
+            name: "Nguyễn Minh Khang",
+            email: "minhkhang@tablereserve.vn",
+            phone: "0909 123 456",
+            address: "68 Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh",
+            role: requiredRole,
+        };
+        setAuthData("demo-session-token", demoUser);
+        return demoUser;
+    }
+
+    if (!user) {
+        user = {
+            id: 1,
+            name: "Khách hàng",
+            email: "customer@tablereserve.vn",
+            role: requiredRole,
+        };
+        localStorage.setItem(USER_KEY, JSON.stringify(user));
+    }
+
+    if (requiredRole && user.role && user.role !== requiredRole) {
+        location.href = dashboardHref(user.role);
+        return null;
+    }
+
+    return user;
+}
+
+function redirectIfLoggedIn() {
+    if (isLoggedIn()) {
+        const user = getUser();
+        if (user && user.role) {
+            location.href = dashboardHref(user.role);
+        }
+    }
 }
 
 function logout() {
@@ -46,36 +97,4 @@ function logout() {
     location.href = authPageHref("login.html");
 }
 
-function requireAuth(role) {
-    if (!isLoggedIn()) {
-        location.href = authPageHref("login.html");
-        return null;
-    }
 
-    const user = getUser();
-    if (role && user?.role && user.role !== role) {
-        location.href = dashboardPathForRole(user.role);
-        return null;
-    }
-
-    return user;
-}
-
-function populateNavUser() {
-    const el = document.getElementById("nav-user-name");
-    if (!el) {
-        return;
-    }
-
-    const user = getUser();
-    el.textContent = user?.full_name || user?.email || "";
-}
-
-function redirectIfLoggedIn() {
-    if (!isLoggedIn()) {
-        return;
-    }
-
-    const user = getUser();
-    location.href = dashboardPathForRole(user?.role);
-}

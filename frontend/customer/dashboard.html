@@ -1,2 +1,141 @@
-<!-- frontend/customer/dashboard.html -->
-<!-- TODO: Map + GPS + Dijkstra nearby list -->
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bảng điều khiển — Restaurant Booking</title>
+    <meta name="description" content="Quản lý thông tin cá nhân, đặt bàn và xem lịch sử đặt chỗ.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+
+<body class="app-body">
+    <div class="app-shell">
+        <header class="dash-header">
+            <div class="dash-identity">
+                <div id="dash-avatar" class="dash-avatar" aria-hidden="true">?</div>
+                <div class="dash-identity-text">
+                    <p class="dash-greet">Xin chào</p>
+                    <h1 id="dash-user-name">Khách</h1>
+                </div>
+            </div>
+            <button type="button" id="btn-logout" class="btn-ghost dash-logout">Đăng xuất</button>
+        </header>
+
+        <div class="dash-layout">
+            <aside class="dash-sidebar" aria-label="Menu tài khoản">
+                <button type="button" class="dash-nav-btn active" data-view="profile" aria-current="page">
+                    Thông tin cá nhân
+                </button>
+                <button type="button" class="dash-nav-btn" data-view="booking">
+                    Đặt bàn
+                </button>
+                <button type="button" class="dash-nav-btn" data-view="history">
+                    Lịch sử
+                </button>
+            </aside>
+
+            <main class="dash-main">
+                <section id="view-profile" class="dash-view" aria-labelledby="profile-heading">
+                    <div class="dash-panel">
+                        <h2 id="profile-heading">Thông tin cá nhân</h2>
+                        <p class="dash-panel-lead">Bạn có thể cập nhật email, số điện thoại và địa chỉ của mình.</p>
+
+                        <div id="profile-error" class="form-alert" hidden role="alert"></div>
+                        <div id="profile-success" class="form-alert alert-success" hidden role="status"></div>
+
+                        <form id="profile-form" novalidate>
+                            <div class="form-group">
+                                <label for="profile-name">Họ và tên</label>
+                                <input id="profile-name" name="name" type="text" autocomplete="name" required placeholder="Nguyễn Văn A">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="profile-email">Email</label>
+                                <input id="profile-email" name="email" type="email" autocomplete="email" required placeholder="ban@email.com">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="profile-phone">Số điện thoại</label>
+                                <input id="profile-phone" name="phone" type="tel" autocomplete="tel" placeholder="0901 234 567">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="profile-address">Địa chỉ</label>
+                                <textarea id="profile-address" name="address" rows="3" autocomplete="street-address" placeholder="Số nhà, đường, phường/xã, tỉnh/thành"></textarea>
+                            </div>
+
+                            <div class="profile-action-row">
+                                <button type="submit" id="btn-save-profile" class="btn-primary">Thay đổi thông tin</button>
+                                <button type="button" id="btn-delete-account" class="btn-danger">Xoá tài khoản</button>
+                            </div>
+                        </form>
+                    </div>
+                </section>
+
+                <section id="view-booking" class="dash-view" hidden aria-labelledby="booking-heading">
+                    <div class="dash-panel">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px; margin-bottom:20px;">
+                            <div>
+                                <h2 id="booking-heading">Đặt Bàn Nhà Hàng</h2>
+                                <p class="dash-panel-lead" style="margin-bottom:0;">
+                                    Tìm kiếm các chi nhánh gần nhất qua thuật toán định vị đường bộ, giữ chỗ ngay lập tức và đặt trước thực đơn cao cấp.
+                                </p>
+                            </div>
+                            <a class="btn-primary" href="book.html" style="display:inline-flex; align-items:center; gap:8px; padding:13px 26px; text-decoration:none;">
+                                <span>Đến trang đặt bàn</span>
+                                <span aria-hidden="true">→</span>
+                            </a>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-top:24px;">
+                            <div style="background:var(--cream); padding:18px; border-radius:16px; border:1px solid var(--line);">
+                                <span style="font-size:1.8rem; display:block; margin-bottom:8px;">📍</span>
+                                <h4 style="font-family:Fraunces,serif; color:var(--wine-deep); margin:0 0 6px;">Định vị Dijkstra</h4>
+                                <p style="font-size:0.85rem; color:var(--muted); margin:0; line-height:1.45;">Tự động tính khoảng cách và thời gian di chuyển thực tế từ vị trí của bạn.</p>
+                            </div>
+                            <div style="background:var(--cream); padding:18px; border-radius:16px; border:1px solid var(--line);">
+                                <span style="font-size:1.8rem; display:block; margin-bottom:8px;">🍲</span>
+                                <h4 style="font-family:Fraunces,serif; color:var(--wine-deep); margin:0 0 6px;">Đặt trước món ăn</h4>
+                                <p style="font-size:0.85rem; color:var(--muted); margin:0; line-height:1.45;">Chọn món ăn đặc sản được yêu thích để bếp chuẩn bị chu đáo trước giờ đến.</p>
+                            </div>
+                            <div style="background:var(--cream); padding:18px; border-radius:16px; border:1px solid var(--line);">
+                                <span style="font-size:1.8rem; display:block; margin-bottom:8px;">🛡</span>
+                                <h4 style="font-family:Fraunces,serif; color:var(--wine-deep); margin:0 0 6px;">Quy tắc hủy 24h</h4>
+                                <p style="font-size:0.85rem; color:var(--muted); margin:0; line-height:1.45;">Chính sách hủy chỗ linh hoạt, miễn phí trước 24 giờ so với giờ dùng bữa.</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="view-history" class="dash-view" hidden aria-labelledby="history-heading">
+                    <div class="dash-panel">
+                        <h2 id="history-heading">Lịch sử</h2>
+                        <p class="dash-panel-lead">Xem các lần đặt bàn và trạng thái xác nhận, từ chối hoặc hủy.</p>
+                        <a class="btn-primary" href="history.html">Xem lịch sử đặt bàn</a>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <div id="delete-modal" class="modal-overlay" hidden>
+        <div class="modal-card" role="alertdialog" aria-labelledby="delete-title" aria-describedby="delete-desc">
+            <h3 id="delete-title">Xoá tài khoản?</h3>
+            <p id="delete-desc">Hành động này sẽ đăng xuất và gỡ thông tin tài khoản trên thiết bị. Bạn không thể hoàn tác trên trình duyệt này.</p>
+            <div class="profile-action-row">
+                <button type="button" id="btn-confirm-delete" class="btn-danger">Xác nhận xoá</button>
+                <button type="button" id="btn-cancel-delete" class="btn-ghost">Huỷ</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/auth.js"></script>
+    <script src="../js/api.js"></script>
+    <script src="../js/customer-dashboard.js"></script>
+</body>
+
+</html>

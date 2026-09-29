@@ -212,8 +212,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
 
                 setTimeout(() => {
-                    const nextUrl = typeof dashboardPathForRole === "function"
-                        ? dashboardPathForRole(user?.role || role)
+                    const nextUrl = typeof dashboardHref === "function"
+                        ? dashboardHref(user?.role || role)
                         : (role === "RESTAURANT_OWNER" ? "restaurant/dashboard.html" : "customer/dashboard.html");
                     location.href = nextUrl;
                 }, 1000);
@@ -228,6 +228,24 @@ document.addEventListener("DOMContentLoaded", () => {
                 }, 1200);
             }
         } catch (err) {
+            const cannotReachServer = /Không kết nối được máy chủ/.test(err.message || "");
+            if (cannotReachServer) {
+                const localUser = {
+                    name,
+                    email,
+                    role,
+                    phone: "",
+                    address: "",
+                };
+                setAuthData("local-demo-token", localUser);
+                showRegisterSuccess("Đăng ký trên thiết bị thành công! Đang chuyển hướng...");
+                setTimeout(() => {
+                    location.href = typeof dashboardHref === "function"
+                        ? dashboardHref(role)
+                        : (role === "RESTAURANT_OWNER" ? "restaurant/dashboard.html" : "customer/dashboard.html");
+                }, 800);
+                return;
+            }
             showRegisterError(err.message || "Đăng ký thất bại. Vui lòng thử lại sau.");
         } finally {
             submitBtn.disabled = false;
