@@ -23,7 +23,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from models import Branch, Reservation, ReservationStatus
+from backend.models import Branch, Reservation, ReservationStatus
 
 
 logger = logging.getLogger(__name__)

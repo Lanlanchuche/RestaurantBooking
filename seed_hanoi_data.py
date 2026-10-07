@@ -29,8 +29,7 @@ def seed_data():
     for i in range(1, 11):
         owner = User(
             email=f"owner{i}@gmail.com",
-            password_hash=get_password_hash("123456"),
-            name=f"Chủ nhà hàng {i}",
+            hashed_password=get_password_hash("123456"),
             role=UserRole.RESTAURANT_OWNER
         )
         db.add(owner)
@@ -46,8 +45,7 @@ def seed_data():
         res = Restaurant(
             owner_id=owner.id,
             name=restaurant_names[i],
-            email=f"contact@{restaurant_names[i].replace(' ', '').lower()}.vn",
-            phone=f"0988000{i:03d}"
+            description=f"Một trong những nhà hàng nổi tiếng tại Hà Nội - {restaurant_names[i]}"
         )
         db.add(res)
         restaurants.append(res)

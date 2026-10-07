@@ -12,8 +12,17 @@ class UserLogin(BaseModel):
     email: str
     password: str
 
+class UserCreate(BaseModel):
+    name: str
+    email: str
+    password: str
+    role: str
+    restaurant_name: str | None = None
+    restaurant_email: str | None = None
+    restaurant_phone: str | None = None
+
 @router.post("/register", response_model=schemas.UserResponse, status_code=201)
-def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
+def register(user_in: UserCreate, db: Session = Depends(get_db)):
     """Đăng ký tài khoản mới."""
     existing_user = db.query(models.User).filter(models.User.email == user_in.email).first()
     if existing_user:
@@ -22,14 +31,30 @@ def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
     hashed_pwd = auth.get_password_hash(user_in.password)
     new_user = models.User(
         email=user_in.email,
-        password_hash=hashed_pwd,
-        name=user_in.name,
-        phone=user_in.phone,
+        hashed_password=hashed_pwd,
         role=user_in.role
     )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    
+    # Tạo profile dựa trên role
+    if user_in.role == models.UserRole.RESTAURANT_OWNER:
+        res_profile = models.Restaurant(
+            owner_id=new_user.id,
+            name=user_in.restaurant_name or f"Nhà hàng của {user_in.name}",
+            description=f"Email liên hệ: {user_in.restaurant_email or user_in.email}"
+        )
+        db.add(res_profile)
+    else:
+        # Mặc định là CUSTOMER
+        cus_profile = models.Customer(
+            user_id=new_user.id,
+            full_name=user_in.name,
+        )
+        db.add(cus_profile)
+    
+    db.commit()
     return new_user
 
 @router.post("/login")

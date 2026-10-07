@@ -96,7 +96,7 @@ class EmailService:
         
         body_customer = self._base_html(
             "Đã nhận yêu cầu đặt bàn",
-            f"<p>Chào {customer.name}, yêu cầu đặt bàn của bạn đang chờ xác nhận.</p>" +
+            f"<p>Chào {customer.full_name}, yêu cầu đặt bàn của bạn đang chờ xác nhận.</p>" +
             self._row("Mã đặt bàn", f"#{reservation.id}") +
             self._row("Nhà hàng", branch.name) +
             self._row("Số khách", str(reservation.guest_count)) +
@@ -106,16 +106,16 @@ class EmailService:
         
         body_restaurant = self._base_html(
             "Có đặt bàn mới cần xác nhận",
-            f"<p>Khách hàng {customer.name} vừa đặt bàn.</p>" +
+            f"<p>Khách hàng {customer.full_name} vừa đặt bàn.</p>" +
             self._row("Mã đặt bàn", f"#{reservation.id}") +
-            self._row("Email khách", customer.email) +
+            self._row("Email khách", customer.user.email) +
             self._row("Số khách", str(reservation.guest_count)) +
             self._row("Thời gian", str(reservation.reservation_time))
         )
         
-        await self._send(customer.email, subject, body_customer)
-        if branch.restaurant and branch.restaurant.email:
-            await self._send(branch.restaurant.email, subject, body_restaurant)
+        await self._send(customer.user.email, subject, body_customer)
+        if branch.restaurant and branch.restaurant.owner and branch.restaurant.owner.email:
+            await self._send(branch.restaurant.owner.email, subject, body_restaurant)
 
     async def send_confirmed(self, customer, branch, reservation):
         """
@@ -129,14 +129,14 @@ class EmailService:
         subject = f"Đã xác nhận đặt bàn: {branch.name} - #{reservation.id}"
         body = self._base_html(
             "Đặt bàn của bạn đã được xác nhận",
-            f"<p>Chào {customer.name}, nhà hàng đã xác nhận đơn đặt bàn của bạn.</p>" +
+            f"<p>Chào {customer.full_name}, nhà hàng đã xác nhận đơn đặt bàn của bạn.</p>" +
             self._row("Mã đặt bàn", f"#{reservation.id}") +
             self._row("Nhà hàng", branch.name) +
             self._row("Thời gian", str(reservation.reservation_time)) +
             self._row("Số bàn", f"#{reservation.table_number}") +
             self._row("Trạng thái", "✅ Đã xác nhận")
         )
-        await self._send(customer.email, subject, body)
+        await self._send(customer.user.email, subject, body)
 
     async def send_rejected(self, customer, branch, reservation, reason: str):
         """
@@ -151,13 +151,13 @@ class EmailService:
         subject = f"Từ chối đặt bàn: {branch.name} - #{reservation.id}"
         body = self._base_html(
             "Đặt bàn của bạn bị từ chối",
-            f"<p>Chào {customer.name}, rất tiếc nhà hàng không thể nhận đơn đặt bàn của bạn lúc này.</p>" +
+            f"<p>Chào {customer.full_name}, rất tiếc nhà hàng không thể nhận đơn đặt bàn của bạn lúc này.</p>" +
             self._row("Mã đặt bàn", f"#{reservation.id}") +
             self._row("Nhà hàng", branch.name) +
             self._row("Lý do từ chối", reason) +
             self._row("Trạng thái", "❌ Đã từ chối")
         )
-        await self._send(customer.email, subject, body)
+        await self._send(customer.user.email, subject, body)
 
     async def send_cancelled(self, customer, branch, reservation):
         """
@@ -174,8 +174,8 @@ class EmailService:
             f"<p>Đơn đặt bàn #{reservation.id} tại {branch.name} đã được hủy.</p>" +
             self._row("Trạng thái", "🚫 Đã hủy")
         )
-        await self._send(customer.email, subject, body)
-        if branch.restaurant and branch.restaurant.email:
-            await self._send(branch.restaurant.email, subject, body)
+        await self._send(customer.user.email, subject, body)
+        if branch.restaurant and branch.restaurant.owner and branch.restaurant.owner.email:
+            await self._send(branch.restaurant.owner.email, subject, body)
 
 email_service = EmailService()

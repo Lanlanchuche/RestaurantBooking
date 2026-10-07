@@ -9,7 +9,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from models import ReservationStatus, UserRole
+from backend.models import ReservationStatus, UserRole
 
 # ==========================================
 # 1. AUTHENTICATION SCHEMAS
