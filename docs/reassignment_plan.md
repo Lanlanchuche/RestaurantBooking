@@ -10,19 +10,19 @@
 ## 1. DEV 1: Fix lỗi Phase 1 — "Cứu vãn máy chủ"
 *(Phải làm ngay lập tức, nếu không toàn bộ hệ thống không thể chạy API)*
 
-- [ ] **`backend/auth.py`**: Viết logic băm mật khẩu (dùng `passlib` bcrypt) và mã hóa JWT Token (dùng `python-jose`).
-- [ ] **`backend/dependencies.py`**: Viết hàm `get_current_user` đọc token từ header để chặn các request trái phép.
-- [ ] **`backend/routers/auth_router.py`**: Viết API `/api/auth/register`, `/api/auth/login`, và `/api/auth/me`.
-- [ ] **`backend/main.py`**: Khởi tạo `FastAPI()`, thêm `CORSMiddleware`, setup cấu hình tạo DB, và mount tất cả routers (auth, customer, restaurant, websocket).
+- [x] **`backend/auth.py`**: Viết logic băm mật khẩu (dùng `passlib` bcrypt) và mã hóa JWT Token (dùng `python-jose`).
+- [x] **`backend/dependencies.py`**: Viết hàm `get_current_user` đọc token từ header để chặn các request trái phép.
+- [x] **`backend/routers/auth_router.py`**: Viết API `/api/auth/register`, `/api/auth/login`, và `/api/auth/me`.
+- [x] **`backend/main.py`**: Khởi tạo `FastAPI()`, thêm `CORSMiddleware`, setup cấu hình tạo DB, và mount tất cả routers (auth, customer, restaurant, websocket).
 
 ---
 
 ## 2. DEV 2: Dọn dẹp chiến trường & API Khách Hàng
 *(Logic đã code xong nhưng để nhầm ở root folder, cần fix)*
 
-- [ ] **Di chuyển file**: Chuyển `dijkstra_service.py` và `reservation_service.py` từ thư mục gốc (`/`) vào đúng thư mục là `backend/services/`.
-- [ ] **Sửa đường dẫn Import**: Cập nhật lại các import bên trong 2 file trên để khớp với cấu trúc mới.
-- [ ] **`backend/routers/customer_router.py`**: Hoàn thiện các API:
+- [x] **Di chuyển file**: Chuyển `dijkstra_service.py` và `reservation_service.py` từ thư mục gốc (`/`) vào đúng thư mục là `backend/services/`.
+- [x] **Sửa đường dẫn Import**: Cập nhật lại các import bên trong 2 file trên để khớp với cấu trúc mới.
+- [x] **`backend/routers/customer_router.py`**: Hoàn thiện các API:
   - `GET /api/customer/branches/nearby` (Gọi dijkstra)
   - `POST /api/customer/reservations` (Tạo đặt bàn)
   - `GET /api/customer/reservations` (Lịch sử đặt bàn)

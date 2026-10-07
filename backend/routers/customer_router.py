@@ -14,11 +14,11 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-import models
-import schemas
-from database import get_db
-from dependencies import get_current_user
-from services import dijkstra_service, reservation_service
+from backend import models
+from backend import schemas
+from backend.database import get_db
+from backend.dependencies import get_current_user
+from backend.services import dijkstra_service, reservation_service
 
 
 router = APIRouter(
