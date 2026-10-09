@@ -27,15 +27,15 @@
 
         <div class="dash-layout">
             <aside class="dash-sidebar" aria-label="Menu tài khoản">
-                <button type="button" class="dash-nav-btn active" data-view="profile" aria-current="page">
+                <a href="dashboard.html" class="dash-nav-btn active" data-view="profile" aria-current="page">
                     Thông tin cá nhân
-                </button>
-                <button type="button" class="dash-nav-btn" data-view="booking">
+                </a>
+                <a href="book.html" class="dash-nav-btn">
                     Đặt bàn
-                </button>
-                <button type="button" class="dash-nav-btn" data-view="history">
+                </a>
+                <a href="history.html" class="dash-nav-btn">
                     Lịch sử
-                </button>
+                </a>
             </aside>
 
             <main class="dash-main">
@@ -73,49 +73,6 @@
                                 <button type="button" id="btn-delete-account" class="btn-danger">Xoá tài khoản</button>
                             </div>
                         </form>
-                    </div>
-                </section>
-
-                <section id="view-booking" class="dash-view" hidden aria-labelledby="booking-heading">
-                    <div class="dash-panel">
-                        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px; margin-bottom:20px;">
-                            <div>
-                                <h2 id="booking-heading">Đặt Bàn Nhà Hàng</h2>
-                                <p class="dash-panel-lead" style="margin-bottom:0;">
-                                    Tìm kiếm các chi nhánh gần nhất qua thuật toán định vị đường bộ, giữ chỗ ngay lập tức và đặt trước thực đơn cao cấp.
-                                </p>
-                            </div>
-                            <a class="btn-primary" href="book.html" style="display:inline-flex; align-items:center; gap:8px; padding:13px 26px; text-decoration:none;">
-                                <span>Đến trang đặt bàn</span>
-                                <span aria-hidden="true">→</span>
-                            </a>
-                        </div>
-
-                        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-top:24px;">
-                            <div style="background:var(--cream); padding:18px; border-radius:16px; border:1px solid var(--line);">
-                                <span style="font-size:1.8rem; display:block; margin-bottom:8px;">📍</span>
-                                <h4 style="font-family:Fraunces,serif; color:var(--wine-deep); margin:0 0 6px;">Định vị Dijkstra</h4>
-                                <p style="font-size:0.85rem; color:var(--muted); margin:0; line-height:1.45;">Tự động tính khoảng cách và thời gian di chuyển thực tế từ vị trí của bạn.</p>
-                            </div>
-                            <div style="background:var(--cream); padding:18px; border-radius:16px; border:1px solid var(--line);">
-                                <span style="font-size:1.8rem; display:block; margin-bottom:8px;">🍲</span>
-                                <h4 style="font-family:Fraunces,serif; color:var(--wine-deep); margin:0 0 6px;">Đặt trước món ăn</h4>
-                                <p style="font-size:0.85rem; color:var(--muted); margin:0; line-height:1.45;">Chọn món ăn đặc sản được yêu thích để bếp chuẩn bị chu đáo trước giờ đến.</p>
-                            </div>
-                            <div style="background:var(--cream); padding:18px; border-radius:16px; border:1px solid var(--line);">
-                                <span style="font-size:1.8rem; display:block; margin-bottom:8px;">🛡</span>
-                                <h4 style="font-family:Fraunces,serif; color:var(--wine-deep); margin:0 0 6px;">Quy tắc hủy 24h</h4>
-                                <p style="font-size:0.85rem; color:var(--muted); margin:0; line-height:1.45;">Chính sách hủy chỗ linh hoạt, miễn phí trước 24 giờ so với giờ dùng bữa.</p>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <section id="view-history" class="dash-view" hidden aria-labelledby="history-heading">
-                    <div class="dash-panel">
-                        <h2 id="history-heading">Lịch sử</h2>
-                        <p class="dash-panel-lead">Xem các lần đặt bàn và trạng thái xác nhận, từ chối hoặc hủy.</p>
-                        <a class="btn-primary" href="history.html">Xem lịch sử đặt bàn</a>
                     </div>
                 </section>
             </main>
