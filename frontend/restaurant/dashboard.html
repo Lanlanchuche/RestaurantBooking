@@ -1,2 +1,378 @@
-<!-- frontend/restaurant/dashboard.html -->
-<!-- TODO: Real-time order dashboard (WebSocket + confirm/reject) -->
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản Lý Đơn Đặt Bàn — TableReserve</title>
+    <meta name="description" content="Bảng điều khiển nhận đơn đặt bàn thời gian thực qua WebSocket, xác nhận hoặc từ chối đơn theo chi nhánh.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/custom.css">
+</head>
+
+<body class="app-body">
+    <div class="restaurant-shell">
+        <!-- Header Đồng bộ giống Customer: Avatar, Tên bên trái, Nút Đăng xuất bên phải -->
+        <header class="dash-header">
+            <div class="dash-identity">
+                <div id="owner-avatar" class="dash-avatar" aria-hidden="true">QL</div>
+                <div class="dash-identity-text">
+                    <p class="dash-greet">Quản lý nhà hàng</p>
+                    <h1 id="owner-name">Quản lý</h1>
+                    <div id="owner-restaurant" class="owner-restaurant-tag">Le Ciel Gourmet</div>
+                </div>
+            </div>
+            <button type="button" id="btn-logout" class="btn-ghost dash-logout">Đăng xuất</button>
+        </header>
+
+        <!-- Thanh Navigation chính: Trang chủ, Đơn đặt bàn, Quản lý chi nhánh -->
+        <nav class="restaurant-nav-bar" aria-label="Thanh điều hướng">
+            <div class="restaurant-nav-items">
+                <a href="../index.html" class="nav-item-link" title="Về trang chủ TableReserve">
+                    <span class="nav-item-icon">🏠</span>
+                    <span class="nav-item-text">Trang chủ</span>
+                </a>
+                <a href="dashboard.html" class="nav-item-link active" aria-current="page">
+                    <span class="nav-item-icon">📋</span>
+                    <span class="nav-item-text">Đơn Đặt Bàn</span>
+                </a>
+                <a href="branches.html" class="nav-item-link">
+                    <span class="nav-item-icon">🏢</span>
+                    <span class="nav-item-text">Quản Lý Chi Nhánh</span>
+                </a>
+            </div>
+        </nav>
+
+        <!-- Live Order Arrival Banner (Animated when new order received) -->
+        <aside id="live-order-banner" class="live-alert-banner" hidden role="status" aria-live="polite">
+            <div class="live-alert-content">
+                <span class="live-alert-icon" aria-hidden="true">🛎</span>
+                <div>
+                    <strong>Có đơn đặt bàn mới vừa đến!</strong>
+                    <span id="live-order-details" style="margin-left:6px;">Khách hàng đang chờ xác nhận.</span>
+                </div>
+            </div>
+            <div style="display:flex; gap:8px;">
+                <button type="button" id="btn-banner-view" class="btn-action btn-confirm-act" style="padding:6px 14px;">Xem ngay</button>
+                <button type="button" id="btn-banner-dismiss" class="btn-ghost" style="padding:4px 8px; font-size:0.82rem;">Đóng</button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main>
+            <!-- Hero Header Bar -->
+            <section class="restaurant-hero-bar" aria-labelledby="dash-heading">
+                <div>
+                    <h1 id="dash-heading" class="restaurant-hero-title">Bảng Điều Khiển Đặt Bàn</h1>
+                    <p class="restaurant-hero-lead">
+                        Tiếp nhận và quản lý đơn đặt bàn trực tuyến theo thời gian thực từ khách hàng qua kết nối WebSocket.
+                    </p>
+                </div>
+                <div class="restaurant-hero-actions">
+                    <button type="button" id="btn-simulate-order" class="btn-ghost" style="border:1px dashed var(--wine); color:var(--wine); font-size:0.86rem; padding:8px 16px;" title="Mô phỏng sự kiện WebSocket gửi đơn đặt bàn mới từ khách hàng">
+                        <span>⚡ Giả lập đơn mới (Test WS)</span>
+                    </button>
+                    <button type="button" id="btn-refresh" class="btn-primary" style="padding:9px 20px; font-size:0.9rem;">
+                        <span>🔄 Làm mới dữ liệu</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Stats Bar -->
+            <section class="stats-grid" style="margin-top:20px;" aria-label="Thống kê đơn đặt bàn">
+                <div class="stat-box">
+                    <div class="stat-header">
+                        <p class="stat-label">Tổng đơn hôm nay</p>
+                        <span class="stat-icon" aria-hidden="true">📊</span>
+                    </div>
+                    <div id="stat-total" class="stat-value">0</div>
+                    <span class="stat-subtext">Tất cả trạng thái</span>
+                </div>
+
+                <div class="stat-box pending">
+                    <div class="stat-header">
+                        <p class="stat-label">Chờ duyệt (Pending)</p>
+                        <span class="stat-icon" aria-hidden="true">⏳</span>
+                    </div>
+                    <div id="stat-pending" class="stat-value">0</div>
+                    <span class="stat-subtext">Cần phản hồi ngay</span>
+                </div>
+
+                <div class="stat-box confirmed">
+                    <div class="stat-header">
+                        <p class="stat-label">Đã duyệt (Confirmed)</p>
+                        <span class="stat-icon" aria-hidden="true">✓</span>
+                    </div>
+                    <div id="stat-confirmed" class="stat-value">0</div>
+                    <span class="stat-subtext">Sẵn sàng đón khách</span>
+                </div>
+
+                <div class="stat-box rejected">
+                    <div class="stat-header">
+                        <p class="stat-label">Từ chối / Đã hủy</p>
+                        <span class="stat-icon" aria-hidden="true">✕</span>
+                    </div>
+                    <div id="stat-rejected" class="stat-value">0</div>
+                    <span class="stat-subtext">Bàn đã giải phóng</span>
+                </div>
+
+                <div class="stat-box guests">
+                    <div class="stat-header">
+                        <p class="stat-label">Khách dự kiến</p>
+                        <span class="stat-icon" aria-hidden="true">👥</span>
+                    </div>
+                    <div id="stat-guests" class="stat-value">0</div>
+                    <span class="stat-subtext">Tổng số lượng khách</span>
+                </div>
+            </section>
+
+            <!-- Filters & Controls Toolbar -->
+            <section class="dashboard-controls" style="margin-top:24px;" aria-label="Bộ lọc và tìm kiếm đơn đặt bàn">
+                <!-- Status Filter Pills -->
+                <div id="filter-status-group" class="filter-pills-group" role="tablist" aria-label="Lọc theo trạng thái">
+                    <button type="button" class="filter-pill active" data-status="ALL" role="tab" aria-selected="true">
+                        <span>Tất cả</span>
+                        <span id="badge-count-all" class="filter-count">0</span>
+                    </button>
+                    <button type="button" class="filter-pill" data-status="PENDING" role="tab" aria-selected="false">
+                        <span>⏳ Chờ duyệt</span>
+                        <span id="badge-count-pending" class="filter-count">0</span>
+                    </button>
+                    <button type="button" class="filter-pill" data-status="CONFIRMED" role="tab" aria-selected="false">
+                        <span>✓ Đã xác nhận</span>
+                        <span id="badge-count-confirmed" class="filter-count">0</span>
+                    </button>
+                    <button type="button" class="filter-pill" data-status="REJECTED" role="tab" aria-selected="false">
+                        <span>✕ Từ chối</span>
+                        <span id="badge-count-rejected" class="filter-count">0</span>
+                    </button>
+                    <button type="button" class="filter-pill" data-status="CANCELLED" role="tab" aria-selected="false">
+                        <span>⊘ Đã hủy</span>
+                        <span id="badge-count-cancelled" class="filter-count">0</span>
+                    </button>
+                </div>
+
+                <!-- Secondary Filters: Branch, Search -->
+                <div class="search-select-group">
+                    <select id="filter-branch" class="select-custom" aria-label="Lọc theo chi nhánh">
+                        <option value="ALL">🏢 Tất cả chi nhánh</option>
+                    </select>
+
+                    <select id="filter-timeframe" class="select-custom" aria-label="Lọc theo thời gian">
+                        <option value="ALL">📅 Mọi khung thời gian</option>
+                        <option value="TODAY">Hôm nay</option>
+                        <option value="UPCOMING">Sắp tới</option>
+                    </select>
+
+                    <div class="search-input-wrap">
+                        <span class="search-icon" aria-hidden="true">🔍</span>
+                        <input type="search" id="input-search" placeholder="Mã đơn, tên khách, SĐT..." aria-label="Tìm kiếm đơn đặt bàn">
+                    </div>
+                </div>
+            </section>
+
+            <!-- Reservations Data Table -->
+            <section class="table-card" style="margin-top:20px;" aria-label="Danh sách đơn đặt bàn">
+                <div class="table-responsive">
+                    <table class="res-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Mã Đơn</th>
+                                <th scope="col">Khách Hàng</th>
+                                <th scope="col">Chi Nhánh &amp; Bàn</th>
+                                <th scope="col">Thời Gian Đón Tiếp</th>
+                                <th scope="col">Số Khách</th>
+                                <th scope="col">Món Trước &amp; Yêu Cầu</th>
+                                <th scope="col">Trạng Thái</th>
+                                <th scope="col" style="text-align:right;">Thao Tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reservations-tbody">
+                            <!-- Rows injected dynamically by dashboard.js -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Empty State -->
+                <div id="table-empty-state" class="table-empty-state" hidden>
+                    <div class="table-empty-icon" aria-hidden="true">📭</div>
+                    <h3 class="table-empty-text">Không tìm thấy đơn đặt bàn nào</h3>
+                    <p class="table-empty-sub">Hãy thử đổi điều kiện lọc, tìm kiếm hoặc chờ khách hàng tạo đơn mới.</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- ======================================================================
+         MODALS
+         ====================================================================== -->
+
+    <!-- Modal 1: Xác Nhận Đơn (Confirm Modal) -->
+    <div id="modal-confirm" class="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="modal-confirm-title">
+        <div class="modal-window">
+            <div class="modal-head">
+                <h3 id="modal-confirm-title" class="modal-title">Xác Nhận Đặt Bàn</h3>
+                <button type="button" class="modal-close-btn" data-close-modal="modal-confirm" aria-label="Đóng">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin:0 0 16px; color:var(--ink); font-size:0.95rem;">
+                    Bạn đang chuẩn bị duyệt đơn đặt bàn cho khách hàng. Hệ thống sẽ tự động gửi email thông báo xác nhận cho khách.
+                </p>
+
+                <div style="background:var(--cream); padding:16px; border-radius:14px; font-size:0.9rem; margin-bottom:16px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                        <span style="color:var(--muted);">Mã đơn:</span>
+                        <strong id="confirm-modal-code" style="color:var(--wine); font-family:monospace;">TR-000000</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                        <span style="color:var(--muted);">Khách hàng:</span>
+                        <strong id="confirm-modal-cust">Nguyễn Văn A</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                        <span style="color:var(--muted);">Thời gian:</span>
+                        <strong id="confirm-modal-time">19:00 • 17/10/2026</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between;">
+                        <span style="color:var(--muted);">Số lượng khách:</span>
+                        <strong id="confirm-modal-guests">2 khách</strong>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="confirm-assign-table">Chỉ định số bàn phục vụ (Tùy chọn)</label>
+                    <input type="number" id="confirm-assign-table" min="1" max="99" placeholder="Ví dụ: Bàn số 04">
+                    <small class="field-hint">Để trống nếu giữ nguyên số bàn tự động của hệ thống.</small>
+                </div>
+            </div>
+            <div class="modal-foot">
+                <button type="button" class="btn-ghost" data-close-modal="modal-confirm">Huỷ bỏ</button>
+                <button type="button" id="btn-submit-confirm" class="btn-action btn-confirm-act" style="padding:10px 20px; font-size:0.92rem;">
+                    ✓ Xác Nhận Duyệt Đơn
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 2: Từ Chối Đơn (Reject Modal - Bắt buộc nhập lý do theo BR-02) -->
+    <div id="modal-reject" class="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="modal-reject-title">
+        <div class="modal-window">
+            <div class="modal-head" style="background:#ffebee; border-color:#ffcdd2;">
+                <h3 id="modal-reject-title" class="modal-title" style="color:#c62828;">Từ Chối Đơn Đặt Bàn</h3>
+                <button type="button" class="modal-close-btn" data-close-modal="modal-reject" aria-label="Đóng">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="background:#fff3e0; border:1px solid #ffe0b2; color:#b78103; padding:12px 14px; border-radius:12px; font-size:0.86rem; margin-bottom:16px;">
+                    <strong>⚠️ Quy tắc nghiệp vụ (BR-02):</strong> Khi từ chối, nhà hàng <strong>bắt buộc phải nhập lý do</strong>. Bàn trống sẽ được hoàn trả tự động và email thông báo sẽ được gửi tới khách.
+                </div>
+
+                <div style="margin-bottom:14px; font-size:0.9rem;">
+                    Mã đơn: <strong id="reject-modal-code" style="font-family:monospace; color:var(--wine);">TR-000000</strong> —
+                    Khách: <strong id="reject-modal-cust">Khách hàng</strong>
+                </div>
+
+                <!-- Gợi ý nhanh lý do từ chối -->
+                <label style="font-size:0.85rem; font-weight:700; color:var(--ink);">Chọn nhanh lý do gợi ý:</label>
+                <div class="reason-chips-group">
+                    <button type="button" class="reason-chip-btn" data-reason="Hết bàn trống vào khung giờ khách yêu cầu.">Hết bàn khung giờ này</button>
+                    <button type="button" class="reason-chip-btn" data-reason="Nhà hàng có sự kiện tiệc kín toàn bộ cơ sở.">Nhà hàng có tiệc kín</button>
+                    <button type="button" class="reason-chip-btn" data-reason="Không liên hệ được khách hàng để xác nhận thông tin.">Không liên lạc được</button>
+                    <button type="button" class="reason-chip-btn" data-reason="Không thể chuẩn bị kịp món ăn đặt trước đặc biệt.">Món đặt trước chưa sẵn sàng</button>
+                </div>
+
+                <!-- Form nhập lý do chi tiết -->
+                <div class="form-group">
+                    <label for="reject-reason-input">Lý do từ chối cụ thể <span class="required-mark">*</span></label>
+                    <textarea id="reject-reason-input" rows="3" required placeholder="Nhập chi tiết lý do từ chối gửi cho khách hàng..."></textarea>
+                    <div id="reject-error-msg" class="form-alert" hidden style="margin-top:8px;">Vui lòng nhập lý do từ chối (không được để trống).</div>
+                </div>
+            </div>
+            <div class="modal-foot">
+                <button type="button" class="btn-ghost" data-close-modal="modal-reject">Huỷ</button>
+                <button type="button" id="btn-submit-reject" class="btn-danger" style="padding:10px 20px; font-size:0.92rem;">
+                    ✕ Xác Nhận Từ Chối
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 3: Chi Tiết Đơn Đặt Bàn (Detail Modal) -->
+    <div id="modal-detail" class="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="modal-detail-title">
+        <div class="modal-window large">
+            <div class="modal-head">
+                <h3 id="modal-detail-title" class="modal-title">Chi Tiết Đơn Đặt Bàn</h3>
+                <button type="button" class="modal-close-btn" data-close-modal="modal-detail" aria-label="Đóng">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; padding-bottom:14px; border-bottom:1px solid var(--line);">
+                    <div>
+                        <span style="font-size:0.8rem; color:var(--muted); text-transform:uppercase;">Mã đặt bàn</span>
+                        <div id="detail-code" style="font-family:monospace; font-size:1.3rem; font-weight:800; color:var(--wine);">TR-000000</div>
+                    </div>
+                    <div id="detail-status-pill">
+                        <!-- Status badge injected -->
+                    </div>
+                </div>
+
+                <div class="form-grid-2" style="margin-bottom:18px;">
+                    <div>
+                        <div class="ticket-field-label">Khách Hàng</div>
+                        <div id="detail-cust-name" class="ticket-field-val">Nguyễn Văn A</div>
+                        <div id="detail-cust-contact" style="font-size:0.86rem; color:var(--muted); margin-top:2px;">0901 234 567 • email@gmail.com</div>
+                    </div>
+                    <div>
+                        <div class="ticket-field-label">Chi Nhánh &amp; Bàn</div>
+                        <div id="detail-branch-name" class="ticket-field-val">Chi nhánh Bến Nghé</div>
+                        <div id="detail-table-no" style="font-size:0.86rem; color:var(--muted); margin-top:2px;">Bàn số 04</div>
+                    </div>
+                    <div>
+                        <div class="ticket-field-label">Thời Gian Đón Khách</div>
+                        <div id="detail-res-time" class="ticket-field-val">19:00 • Thứ Bảy, 17/10/2026</div>
+                    </div>
+                    <div>
+                        <div class="ticket-field-label">Số Lượng Khách</div>
+                        <div id="detail-guest-count" class="ticket-field-val">2 người lớn</div>
+                    </div>
+                </div>
+
+                <!-- Pre-ordered Dishes -->
+                <div style="margin-bottom:18px;">
+                    <div class="ticket-field-label" style="margin-bottom:6px;">Món Ăn Đặt Trước</div>
+                    <div id="detail-dishes-box" style="background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px;">
+                        <span style="color:var(--muted); font-size:0.88rem;">Không có món đặt trước</span>
+                    </div>
+                </div>
+
+                <!-- Special Requests -->
+                <div style="margin-bottom:18px;">
+                    <div class="ticket-field-label" style="margin-bottom:6px;">Yêu Cầu Đặc Biệt / Ghi Chú</div>
+                    <div id="detail-requests-box" style="background:var(--cream); padding:12px 14px; border-radius:12px; font-size:0.9rem; color:var(--ink);">
+                        Không có yêu cầu đặc biệt.
+                    </div>
+                </div>
+
+                <!-- Rejection Reason if any -->
+                <div id="detail-rejection-row" style="margin-bottom:18px;" hidden>
+                    <div class="ticket-field-label" style="color:#c62828; margin-bottom:6px;">Lý Do Từ Chối</div>
+                    <div id="detail-rejection-box" style="background:#ffebee; border:1px solid #ffcdd2; color:#c62828; padding:12px 14px; border-radius:12px; font-size:0.88rem;">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-foot">
+                <button type="button" class="btn-ghost" data-close-modal="modal-detail">Đóng</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audio Beep for new order arrival -->
+    <audio id="audio-alert" preload="auto" hidden></audio>
+
+    <!-- Scripts -->
+    <script src="../js/auth.js"></script>
+    <script src="../js/api.js"></script>
+    <script src="../js/dashboard.js"></script>
+</body>
+
+</html>

@@ -184,7 +184,7 @@ function renderReservationsList() {
                 </div>
                 <div class="res-info-item">
                     <div class="res-info-label">👥 Số lượng khách</div>
-                    <div class="res-info-val">${res.guest_count} khách (${res.seating_area || "Tiêu chuẩn"})</div>
+                    <div class="res-info-val">${res.guest_count} khách${res.seating_area ? ` (${res.seating_area})` : ""}</div>
                 </div>
                 <div class="res-info-item">
                     <div class="res-info-label">🪑 Số bàn</div>
@@ -194,10 +194,12 @@ function renderReservationsList() {
                     <div class="res-info-label">👤 Khách liên hệ</div>
                     <div class="res-info-val">${res.customer_name} • ${res.customer_phone}</div>
                 </div>
+                ${Array.isArray(res.pre_ordered_dishes) && res.pre_ordered_dishes.length > 0 ? `
                 <div class="res-info-item" style="grid-column: 1 / -1;">
                     <div class="res-info-label">🍲 Món đặt trước</div>
                     <div class="res-info-val" style="color:var(--wine);">${dishesText}</div>
                 </div>
+                ` : ""}
                 ${res.special_requests ? `
                 <div class="res-info-item" style="grid-column: 1 / -1;">
                     <div class="res-info-label">📝 Yêu cầu đặc biệt</div>
@@ -259,11 +261,15 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!user) return;
 
     // Header user display
-    const name = displayName(user) || "Khách hàng";
-    const nameEl = document.getElementById("hist-user-name");
-    const avatarEl = document.getElementById("hist-user-avatar");
+    const name = displayName(user) || "Khách";
+    const nameEl = document.getElementById("dash-user-name") || document.getElementById("hist-user-name");
+    const avatarEl = document.getElementById("dash-avatar") || document.getElementById("hist-user-avatar");
     if (nameEl) nameEl.textContent = name;
-    if (avatarEl) avatarEl.textContent = name.slice(0, 2).toUpperCase();
+    if (avatarEl) {
+        const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+        const initials = !parts.length ? "?" : (parts.length === 1 ? parts[0].slice(0, 2).toUpperCase() : (parts[0][0] + parts[parts.length - 1][0]).toUpperCase());
+        avatarEl.textContent = initials;
+    }
 
     // Tải dữ liệu đặt bàn
     reservations = getLocalReservations();
@@ -280,7 +286,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-    const logoutBtn = document.getElementById("btn-hist-logout");
+    const logoutBtn = document.getElementById("btn-logout") || document.getElementById("btn-hist-logout");
     if (logoutBtn) {
         logoutBtn.addEventListener("click", logout);
     }
