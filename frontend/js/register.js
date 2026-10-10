@@ -197,53 +197,61 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         try {
-            const data = await api.post("/auth/register", payload, { skipAuthRedirect: true });
+            await api.post("/auth/register", payload, { skipAuthRedirect: true });
 
-            const token = data?.access_token;
-            let user = data?.user || { name, email, role };
-
-            if (token) {
-                if (typeof setAuthData === "function") {
-                    setAuthData(token, user);
-                }
-                showRegisterSuccess("Đăng ký thành công! Đang chuyển hướng...");
-                if (typeof showToast === "function") {
-                    showToast("Đăng ký thành công! Chào mừng bạn.", "success");
-                }
-
-                setTimeout(() => {
-                    const nextUrl = typeof dashboardHref === "function"
-                        ? dashboardHref(user?.role || role)
-                        : (role === "RESTAURANT_OWNER" ? "restaurant/dashboard.html" : "customer/dashboard.html");
-                    location.href = nextUrl;
-                }, 1000);
-            } else {
-                // Trường hợp API tạo user nhưng yêu cầu đăng nhập
-                showRegisterSuccess("Đăng ký tài khoản thành công! Đang chuyển đến trang đăng nhập...");
-                if (typeof showToast === "function") {
-                    showToast("Đăng ký thành công! Vui lòng đăng nhập.", "success");
-                }
-                setTimeout(() => {
-                    location.href = "login.html";
-                }, 1200);
+            // Luôn đảm bảo không tự động đăng nhập - phải qua trang đăng nhập
+            if (typeof clearAuth === "function") {
+                clearAuth();
             }
+
+            const successMsg = role === "RESTAURANT_OWNER"
+                ? "Đăng ký tài khoản Chủ nhà hàng thành công! Đang chuyển đến trang đăng nhập..."
+                : "Đăng ký tài khoản Khách hàng thành công! Đang chuyển đến trang đăng nhập...";
+
+            showRegisterSuccess(successMsg);
+            if (typeof showToast === "function") {
+                showToast("Đăng ký thành công! Vui lòng đăng nhập để tiếp tục.", "success");
+            }
+
+            setTimeout(() => {
+                location.href = `login.html?registered=1&email=${encodeURIComponent(email)}`;
+            }, 1200);
         } catch (err) {
             const cannotReachServer = /Không kết nối được máy chủ/.test(err.message || "");
             if (cannotReachServer) {
-                const localUser = {
-                    name,
-                    email,
-                    role,
-                    phone: "",
-                    address: "",
-                };
-                setAuthData("local-demo-token", localUser);
-                showRegisterSuccess("Đăng ký trên thiết bị thành công! Đang chuyển hướng...");
+                // Lưu user vào danh sách demo offline để đăng nhập nhận diện đúng vai trò
+                try {
+                    const saved = JSON.parse(localStorage.getItem("registered_demo_users") || "[]");
+                    const userRecord = {
+                        name,
+                        email,
+                        role,
+                        phone: restaurantPhone || "",
+                        restaurant_name: restaurantName || "",
+                        created_at: new Date().toISOString()
+                    };
+                    const existingIdx = saved.findIndex((u) => u.email.toLowerCase() === email.toLowerCase());
+                    if (existingIdx >= 0) {
+                        saved[existingIdx] = userRecord;
+                    } else {
+                        saved.push(userRecord);
+                    }
+                    localStorage.setItem("registered_demo_users", JSON.stringify(saved));
+                } catch (e) {
+                    console.warn("Could not save demo user", e);
+                }
+
+                if (typeof clearAuth === "function") {
+                    clearAuth();
+                }
+
+                showRegisterSuccess("Đăng ký tài khoản thành công! Đang chuyển đến trang đăng nhập...");
+                if (typeof showToast === "function") {
+                    showToast("Đăng ký thành công! Vui lòng đăng nhập để tiếp tục.", "success");
+                }
                 setTimeout(() => {
-                    location.href = typeof dashboardHref === "function"
-                        ? dashboardHref(role)
-                        : (role === "RESTAURANT_OWNER" ? "restaurant/dashboard.html" : "customer/dashboard.html");
-                }, 800);
+                    location.href = `login.html?registered=1&email=${encodeURIComponent(email)}`;
+                }, 1000);
                 return;
             }
             showRegisterError(err.message || "Đăng ký thất bại. Vui lòng thử lại sau.");

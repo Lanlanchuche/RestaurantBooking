@@ -1,2 +1,303 @@
-<!-- frontend/restaurant/branches.html -->
-<!-- TODO: Branch management with map-based coordinate picker -->
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản Lý Chi Nhánh — TableReserve</title>
+    <meta name="description" content="Quản lý danh sách chi nhánh nhà hàng, điều chỉnh số bàn và thiết lập tọa độ GPS trên bản đồ OpenStreetMap phục vụ thuật toán Dijkstra.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/custom.css">
+</head>
+
+<body class="app-body">
+    <div class="restaurant-shell">
+        <!-- Header Đồng bộ giống Customer: Avatar, Tên bên trái, Nút Đăng xuất bên phải -->
+        <header class="dash-header">
+            <div class="dash-identity">
+                <div id="branches-owner-avatar" class="dash-avatar" aria-hidden="true">QL</div>
+                <div class="dash-identity-text">
+                    <p class="dash-greet">Quản lý nhà hàng</p>
+                    <h1 id="branches-owner-name">Quản lý</h1>
+                    <div id="branches-owner-restaurant" class="owner-restaurant-tag">Le Ciel Gourmet</div>
+                </div>
+            </div>
+            <button type="button" id="btn-branches-logout" class="btn-ghost dash-logout">Đăng xuất</button>
+        </header>
+
+        <!-- Thanh Navigation chính: Trang chủ, Đơn đặt bàn, Quản lý chi nhánh -->
+        <nav class="restaurant-nav-bar" aria-label="Thanh điều hướng">
+            <div class="restaurant-nav-items">
+                <a href="../index.html" class="nav-item-link" title="Về trang chủ TableReserve">
+                    <span class="nav-item-icon">🏠</span>
+                    <span class="nav-item-text">Trang chủ</span>
+                </a>
+                <a href="dashboard.html" class="nav-item-link">
+                    <span class="nav-item-icon">📋</span>
+                    <span class="nav-item-text">Đơn Đặt Bàn</span>
+                </a>
+                <a href="branches.html" class="nav-item-link active" aria-current="page">
+                    <span class="nav-item-icon">🏢</span>
+                    <span class="nav-item-text">Quản Lý Chi Nhánh</span>
+                </a>
+            </div>
+            <div class="restaurant-nav-actions">
+                <button type="button" id="btn-quick-add-branch" class="btn-primary" style="padding:8px 18px; font-size:0.88rem;">
+                    <span>+ Thêm Chi Nhánh</span>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main>
+            <!-- Hero Header Bar -->
+            <section class="restaurant-hero-bar" aria-labelledby="branches-heading">
+                <div>
+                    <h1 id="branches-heading" class="restaurant-hero-title">Quản Lý Mạng Lưới Chi Nhánh</h1>
+                    <p class="restaurant-hero-lead">
+                        Thiết lập danh sách cơ sở, quản lý bàn trống và định vị tọa độ GPS trên bản đồ OpenStreetMap để thuật toán Dijkstra chỉ đường chính xác cho khách.
+                    </p>
+                </div>
+                <div class="restaurant-hero-actions">
+                    <button type="button" id="btn-refresh-branches" class="btn-ghost" style="padding:9px 18px; font-size:0.9rem;">
+                        <span>🔄 Tải lại</span>
+                    </button>
+                    <button type="button" id="btn-open-create-branch" class="btn-primary" style="padding:9px 22px; font-size:0.9rem;">
+                        <span>+ Thêm Chi Nhánh Mới</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Branch Network Statistics -->
+            <section class="stats-grid" style="margin-top:20px;" aria-label="Thống kê hệ thống chi nhánh">
+                <div class="stat-box">
+                    <div class="stat-header">
+                        <p class="stat-label">Tổng số cơ sở</p>
+                        <span class="stat-icon" aria-hidden="true">🏢</span>
+                    </div>
+                    <div id="stat-branch-total" class="stat-value">0</div>
+                    <span class="stat-subtext">Đang hoạt động trong hệ thống</span>
+                </div>
+
+                <div class="stat-box">
+                    <div class="stat-header">
+                        <p class="stat-label">Tổng số bàn phục vụ</p>
+                        <span class="stat-icon" aria-hidden="true">🪑</span>
+                    </div>
+                    <div id="stat-total-tables" class="stat-value">0</div>
+                    <span class="stat-subtext">Sức chứa tối đa toàn mạng lưới</span>
+                </div>
+
+                <div class="stat-box confirmed">
+                    <div class="stat-header">
+                        <p class="stat-label">Bàn đang trống</p>
+                        <span class="stat-icon" aria-hidden="true">🟢</span>
+                    </div>
+                    <div id="stat-avail-tables" class="stat-value">0</div>
+                    <span class="stat-subtext">Sẵn sàng nhận đặt bàn mới</span>
+                </div>
+
+                <div class="stat-box pending">
+                    <div class="stat-header">
+                        <p class="stat-label">Bàn đang phục vụ</p>
+                        <span class="stat-icon" aria-hidden="true">🟠</span>
+                    </div>
+                    <div id="stat-occupied-tables" class="stat-value">0</div>
+                    <span class="stat-subtext">Đã có khách hoặc giữ chỗ</span>
+                </div>
+            </section>
+
+            <!-- Split Interactive Layout: List on Left, Map on Right -->
+            <div class="branch-grid-layout" style="margin-top:26px;">
+                <!-- Column 1: Branch List with Search -->
+                <section class="branch-list-col" aria-label="Danh sách các chi nhánh">
+                    <!-- Search & Filter bar -->
+                    <div class="dashboard-controls" style="padding:12px 18px;">
+                        <div class="search-input-wrap" style="flex:1;">
+                            <span class="search-icon" aria-hidden="true">🔍</span>
+                            <input type="search" id="input-search-branch" placeholder="Tìm theo tên chi nhánh, đường, quận..." aria-label="Tìm kiếm chi nhánh">
+                        </div>
+                        <select id="filter-branch-status" class="select-custom" aria-label="Lọc tình trạng bàn">
+                            <option value="ALL">Tất cả tình trạng</option>
+                            <option value="AVAILABLE">Còn bàn trống (&gt;0)</option>
+                            <option value="FULL">Đã hết bàn (=0)</option>
+                        </select>
+                    </div>
+
+                    <!-- Branch Cards Container -->
+                    <div id="branches-container" style="display:flex; flex-direction:column; gap:16px;">
+                        <!-- Cards injected dynamically by branches.js -->
+                    </div>
+
+                    <!-- Empty state -->
+                    <div id="branches-empty-state" class="table-empty-state" hidden>
+                        <div class="table-empty-icon" aria-hidden="true">🏬</div>
+                        <h3 class="table-empty-text">Chưa có chi nhánh nào</h3>
+                        <p class="table-empty-sub">Hãy bấm "+ Thêm Chi Nhánh Mới" để bắt đầu mở rộng mạng lưới cơ sở của bạn.</p>
+                    </div>
+                </section>
+
+                <!-- Column 2: Leaflet Interactive Map -->
+                <aside class="branch-map-col" aria-label="Bản đồ mạng lưới chi nhánh">
+                    <div class="branch-map-card">
+                        <div class="branch-map-header">
+                            <h2 class="branch-map-title">
+                                <span>🗺</span>
+                                <span>Bản Đồ Mạng Lưới Chi Nhánh</span>
+                            </h2>
+                            <button type="button" id="btn-fit-map-bounds" class="btn-ghost" style="padding:4px 10px; font-size:0.8rem;" title="Thu phóng vừa vặn tất cả chi nhánh">
+                                ⤢ Toàn cảnh
+                            </button>
+                        </div>
+                        <div id="branches-main-map" role="region" aria-label="Bản đồ định vị các chi nhánh"></div>
+                        <div class="coord-picker-hint">
+                            <span>💡 <em>Nhấp vào bất kỳ marker nào trên bản đồ để xem nhanh thông tin hoặc chọn cơ sở tương ứng.</em></span>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </main>
+    </div>
+
+    <!-- ======================================================================
+         MODALS
+         ====================================================================== -->
+
+    <!-- Modal 1: Thêm / Sửa Chi Nhánh (Add/Edit Branch Modal with Leaflet Picker) -->
+    <div id="modal-branch-form" class="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="branch-modal-title">
+        <div class="modal-window large">
+            <div class="modal-head">
+                <h3 id="branch-modal-title" class="modal-title">Thêm Chi Nhánh Mới</h3>
+                <button type="button" class="modal-close-btn" data-close-modal="modal-branch-form" aria-label="Đóng">&times;</button>
+            </div>
+
+            <form id="branch-form" novalidate>
+                <div class="modal-body">
+                    <!-- Form alert message -->
+                    <div id="branch-form-alert" class="form-alert" hidden role="alert"></div>
+
+                    <!-- Hidden branch ID for editing -->
+                    <input type="hidden" id="branch-id-input" value="">
+
+                    <!-- Basic info -->
+                    <div class="form-group">
+                        <label for="branch-name-input">Tên chi nhánh <span class="required-mark">*</span></label>
+                        <input type="text" id="branch-name-input" required placeholder="Ví dụ: Chi nhánh Bến Nghé — Quận 1">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="branch-address-input">Địa chỉ chi nhánh <span class="required-mark">*</span></label>
+                        <div style="display:flex; gap:8px;">
+                            <input type="text" id="branch-address-input" required placeholder="Số nhà, đường, phường/xã, quận/huyện, TP...">
+                            <button type="button" id="btn-geocode-address" class="btn-ghost" style="border:1px solid var(--line); white-space:nowrap; padding:0 14px; font-size:0.85rem;" title="Tìm kiếm tọa độ từ địa chỉ đã nhập">
+                                📍 Định vị địa chỉ
+                            </button>
+                        </div>
+                        <small class="field-hint">Nhập địa chỉ rồi bấm "Định vị địa chỉ" để tự động ghim vị trí trên bản đồ.</small>
+                    </div>
+
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label for="branch-phone-input">Số điện thoại hotline</label>
+                            <input type="tel" id="branch-phone-input" placeholder="Ví dụ: 028 3822 9999">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="branch-total-tables-input">Tổng số bàn phục vụ <span class="required-mark">*</span></label>
+                            <input type="number" id="branch-total-tables-input" min="1" max="500" required placeholder="Ví dụ: 20">
+                        </div>
+                    </div>
+
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label for="branch-avail-tables-input">Số bàn trống hiện có <span class="required-mark">*</span></label>
+                            <input type="number" id="branch-avail-tables-input" min="0" max="500" required placeholder="Ví dụ: 12">
+                            <small class="field-hint">Không được vượt quá tổng số bàn.</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="branch-hours-input">Giờ hoạt động</label>
+                            <input type="text" id="branch-hours-input" placeholder="Ví dụ: 10:00 - 22:30">
+                        </div>
+                    </div>
+
+                    <!-- Coordinate Picker Map -->
+                    <div class="coord-picker-box">
+                        <div class="coord-picker-head">
+                            <span>📍 CHỌN TỌA ĐỘ VỊ TRÍ TRÊN BẢN ĐỒ</span>
+                            <div style="display:flex; gap:8px;">
+                                <button type="button" id="btn-picker-gps" class="btn-ghost" style="padding:2px 8px; font-size:0.78rem;">
+                                    📡 Dùng GPS hiện tại
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Mini Picker Map -->
+                        <div id="modal-picker-map"></div>
+
+                        <div class="coord-picker-hint">
+                            <span>👉 <em>Nhấp chuột vào bất cứ đâu trên bản đồ hoặc kéo marker để chọn vị trí chính xác.</em></span>
+                        </div>
+                    </div>
+
+                    <!-- Lat / Lng Readonly / Editable fields -->
+                    <div class="form-grid-2" style="margin-top:12px;">
+                        <div class="form-group">
+                            <label for="branch-lat-input">Vĩ độ (Latitude) <span class="required-mark">*</span></label>
+                            <input type="number" step="0.000001" id="branch-lat-input" required placeholder="Ví dụ: 10.7769">
+                        </div>
+                        <div class="form-group">
+                            <label for="branch-lng-input">Kinh độ (Longitude) <span class="required-mark">*</span></label>
+                            <input type="number" step="0.000001" id="branch-lng-input" required placeholder="Ví dụ: 106.7009">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-foot">
+                    <button type="button" class="btn-ghost" data-close-modal="modal-branch-form">Huỷ</button>
+                    <button type="submit" id="btn-save-branch" class="btn-primary" style="padding:10px 24px;">
+                        💾 Lưu Chi Nhánh
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 2: Xác Nhận Xóa Chi Nhánh (Delete Branch Modal) -->
+    <div id="modal-delete-branch" class="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="delete-branch-title">
+        <div class="modal-window">
+            <div class="modal-head" style="background:#ffebee; border-color:#ffcdd2;">
+                <h3 id="delete-branch-title" class="modal-title" style="color:#c62828;">Xóa Chi Nhánh?</h3>
+                <button type="button" class="modal-close-btn" data-close-modal="modal-delete-branch" aria-label="Đóng">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin:0 0 12px; color:var(--ink); font-size:0.95rem;">
+                    Bạn có chắc chắn muốn xóa chi nhánh <strong id="delete-branch-name-text" style="color:var(--wine-deep);">[Tên chi nhánh]</strong>?
+                </p>
+                <div style="background:#fff3e0; border:1px solid #ffe0b2; color:#b78103; padding:12px 14px; border-radius:12px; font-size:0.86rem;">
+                    <strong>⚠️ Lưu ý:</strong> Hành động này sẽ gỡ bỏ cơ sở khỏi bản đồ tìm kiếm của khách hàng. Số liệu đặt bàn trong quá khứ sẽ vẫn được lưu lại trong lịch sử.
+                </div>
+            </div>
+            <div class="modal-foot">
+                <button type="button" class="btn-ghost" data-close-modal="modal-delete-branch">Huỷ bỏ</button>
+                <button type="button" id="btn-confirm-delete-branch" class="btn-danger" style="padding:10px 20px;">
+                    ✕ Xác Nhận Xóa
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Core JS -->
+    <script src="../js/auth.js"></script>
+    <script src="../js/api.js"></script>
+    <script src="../js/branches.js"></script>
+</body>
+
+</html>

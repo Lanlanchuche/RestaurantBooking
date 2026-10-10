@@ -13,40 +13,38 @@
 </head>
 
 <body class="app-body">
-    <div class="booking-shell">
-        <!-- Top Navigation Bar -->
-        <header class="booking-top-nav">
-            <div class="booking-top-left">
-                <a href="../index.html" class="logo" title="Trang chủ">
-                    <span class="logo-mark" aria-hidden="true">🍽</span>
-                    <span>Restaurant Booking</span>
-                </a>
-                <a href="dashboard.html" class="btn-back-link">
-                    <span>←</span>
-                    <span>Bảng điều khiển</span>
-                </a>
-            </div>
-
-            <div class="booking-top-right">
-                <a href="book.html" class="btn-primary" style="padding:7px 18px; font-size:0.9rem; text-decoration:none;">
-                    <span>+ Đặt bàn mới</span>
-                </a>
-                <div class="booking-user-badge">
-                    <div id="hist-user-avatar" class="booking-user-avatar">KH</div>
-                    <span id="hist-user-name" class="booking-user-name">Khách hàng</span>
+    <div class="app-shell">
+        <header class="dash-header">
+            <div class="dash-identity">
+                <div id="dash-avatar" class="dash-avatar" aria-hidden="true">?</div>
+                <div class="dash-identity-text">
+                    <p class="dash-greet">Xin chào</p>
+                    <h1 id="dash-user-name">Khách</h1>
                 </div>
-                <button type="button" id="btn-hist-logout" class="btn-ghost" style="padding:6px 14px; font-size:0.88rem;">Đăng xuất</button>
             </div>
+            <button type="button" id="btn-logout" class="btn-ghost dash-logout">Đăng xuất</button>
         </header>
 
-        <!-- Main Content -->
-        <main>
-            <div class="booking-hero-header" style="text-align:left; margin-bottom:24px;">
-                <h1 class="booking-hero-title">Lịch Sử Đặt Bàn</h1>
-                <p class="booking-hero-desc" style="margin:0;">
-                    Theo dõi danh sách các lần đặt bàn, tình trạng phê duyệt từ nhà hàng và thực hiện hủy chỗ khi cần thiết.
-                </p>
-            </div>
+        <div class="dash-layout">
+            <aside class="dash-sidebar" aria-label="Menu tài khoản">
+                <a href="dashboard.html" class="dash-nav-btn">
+                    Thông tin cá nhân
+                </a>
+                <a href="book.html" class="dash-nav-btn">
+                    Đặt bàn
+                </a>
+                <a href="history.html" class="dash-nav-btn active" aria-current="page">
+                    Lịch sử
+                </a>
+            </aside>
+
+            <main class="dash-main">
+                <div class="booking-hero-header" style="text-align:left; margin-bottom:24px;">
+                    <h1 class="booking-hero-title">Lịch Sử Đặt Bàn</h1>
+                    <p class="booking-hero-desc" style="margin:0;">
+                        Theo dõi danh sách các lần đặt bàn, tình trạng phê duyệt từ nhà hàng và thực hiện hủy chỗ khi cần thiết.
+                    </p>
+                </div>
 
             <!-- Stats Bar -->
             <div class="history-stats-bar">
@@ -80,7 +78,8 @@
             <section id="reservations-list-container" aria-label="Danh sách đặt bàn">
                 <!-- Dynamic cards rendered by history.js -->
             </section>
-        </main>
+            </main>
+        </div>
     </div>
 
     <!-- Scripts -->

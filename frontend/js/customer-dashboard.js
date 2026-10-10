@@ -62,6 +62,7 @@ function fillProfileForm(user) {
 }
 
 function switchView(viewName) {
+    if (!viewName) return;
     document.querySelectorAll(".dash-view").forEach((view) => {
         view.hidden = view.id !== `view-${viewName}`;
     });
@@ -101,7 +102,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     document.getElementById("btn-logout").addEventListener("click", logout);
 
-    document.querySelectorAll(".dash-nav-btn").forEach((button) => {
+    document.querySelectorAll(".dash-nav-btn[data-view]").forEach((button) => {
         button.addEventListener("click", () => switchView(button.dataset.view));
     });
 

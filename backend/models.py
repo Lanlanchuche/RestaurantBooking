@@ -22,7 +22,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 
-from database import Base
+from backend.database import Base
 
 COORDINATE_PRECISION: int = 10
 COORDINATE_SCALE: int = 6

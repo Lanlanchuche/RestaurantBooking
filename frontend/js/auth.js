@@ -42,7 +42,8 @@ function authPageHref(page = "login.html") {
 function dashboardHref(role) {
     const isSubdir = location.pathname.includes("/customer/") || location.pathname.includes("/restaurant/");
     const prefix = isSubdir ? "../" : "";
-    return role === "RESTAURANT_OWNER"
+    const normalizedRole = String(role || "").toUpperCase();
+    return (normalizedRole === "RESTAURANT_OWNER" || normalizedRole === "OWNER" || normalizedRole === "RESTAURANT")
         ? `${prefix}restaurant/dashboard.html`
         : `${prefix}customer/dashboard.html`;
 }
@@ -86,9 +87,7 @@ function requireAuth(requiredRole = "CUSTOMER") {
 function redirectIfLoggedIn() {
     if (isLoggedIn()) {
         const user = getUser();
-        if (user && user.role) {
-            location.href = dashboardHref(user.role);
-        }
+        location.href = dashboardHref(user?.role);
     }
 }
 

@@ -1,0 +1,1634 @@
+/* ==========================================================================
+   TableReserve — Custom Styles for Restaurant Portal & Core Components
+   Author: Dev 4 (Frontend Specialist)
+   Matches Design Language: Wine / Gold / Paper / Cream Palette
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Restaurant Portal Shell & Header
+   -------------------------------------------------------------------------- */
+.restaurant-shell {
+    max-width: 1360px;
+    margin: 0 auto;
+    padding: 20px 28px 48px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.restaurant-dash-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 22px 28px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 28px;
+    box-shadow: var(--shadow);
+}
+
+.restaurant-dash-header .dash-identity {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    min-width: 0;
+}
+
+.owner-restaurant-tag {
+    font-size: 0.88rem;
+    color: var(--gold);
+    font-weight: 700;
+    margin-top: 4px;
+    letter-spacing: 0.02em;
+}
+
+/* --------------------------------------------------------------------------
+   Restaurant Dedicated Navigation Bar (Nằm bên dưới Header)
+   -------------------------------------------------------------------------- */
+.restaurant-nav-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    background: var(--paper);
+    border: 1.5px solid var(--line);
+    border-radius: 20px;
+    box-shadow: 0 4px 18px rgba(43, 33, 28, 0.04);
+}
+
+.restaurant-nav-items {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.nav-item-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 22px;
+    border-radius: 999px;
+    font-size: 0.94rem;
+    font-weight: 700;
+    color: var(--muted);
+    text-decoration: none;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.nav-item-link:hover {
+    color: var(--wine-deep);
+    background: rgba(124, 45, 45, 0.06);
+    transform: translateY(-1px);
+}
+
+.nav-item-link.active {
+    background: var(--wine);
+    color: var(--gold-soft);
+    box-shadow: 0 4px 14px rgba(124, 45, 45, 0.24);
+}
+
+.restaurant-nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+@media (max-width: 768px) {
+    .restaurant-nav-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        padding: 10px;
+    }
+
+    .restaurant-nav-items {
+        justify-content: center;
+    }
+
+    .nav-item-link {
+        padding: 8px 14px;
+        font-size: 0.88rem;
+    }
+
+    .restaurant-nav-actions {
+        justify-content: center;
+    }
+}
+
+.restaurant-top-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    background: rgba(255, 250, 243, 0.94);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    backdrop-filter: blur(14px);
+    box-shadow: 0 8px 30px rgba(43, 33, 28, 0.06);
+    position: sticky;
+    top: 16px;
+    z-index: 100;
+}
+
+.restaurant-nav-left {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+}
+
+.restaurant-nav-links {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.restaurant-nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--muted);
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.restaurant-nav-link:hover {
+    color: var(--wine-deep);
+    background: rgba(124, 45, 45, 0.06);
+}
+
+.restaurant-nav-link.active {
+    background: var(--wine);
+    color: var(--gold-soft);
+    box-shadow: 0 4px 12px rgba(124, 45, 45, 0.2);
+}
+
+.restaurant-nav-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+/* WebSocket Live Indicator */
+.ws-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    border: 1px solid transparent;
+    transition: all 0.25s ease;
+}
+
+.ws-pill.connected {
+    background: #e8f5e9;
+    color: #1b5e20;
+    border-color: #a5d6a7;
+}
+
+.ws-pill.reconnecting {
+    background: #fff8e1;
+    color: #b78103;
+    border-color: #ffe082;
+}
+
+.ws-pill.disconnected {
+    background: #ffebee;
+    color: #c62828;
+    border-color: #ffcdd2;
+}
+
+.ws-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.ws-pill.connected .ws-dot {
+    background: #2e7d32;
+    box-shadow: 0 0 0 0 rgba(46, 125, 50, 0.7);
+    animation: pulseWsGreen 1.8s infinite;
+}
+
+.ws-pill.reconnecting .ws-dot {
+    background: #f57f17;
+    animation: pulseWsAmber 1.4s infinite;
+}
+
+.ws-pill.disconnected .ws-dot {
+    background: #d32f2f;
+}
+
+@keyframes pulseWsGreen {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(46, 125, 50, 0.6); }
+    70% { transform: scale(1); box-shadow: 0 0 0 7px rgba(46, 125, 50, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(46, 125, 50, 0); }
+}
+
+@keyframes pulseWsAmber {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 127, 23, 0.6); }
+    70% { transform: scale(1); box-shadow: 0 0 0 7px rgba(245, 127, 23, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 127, 23, 0); }
+}
+
+/* Owner Pill Profile */
+.owner-pill {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 12px 4px 6px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+}
+
+.owner-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--wine) 0%, var(--wine-deep) 100%);
+    color: var(--gold-soft);
+    display: grid;
+    place-items: center;
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+.owner-info {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+}
+
+.owner-title {
+    font-size: 0.86rem;
+    font-weight: 700;
+    color: var(--ink);
+}
+
+.owner-restaurant {
+    font-size: 0.74rem;
+    color: var(--muted);
+}
+
+/* --------------------------------------------------------------------------
+   Hero & Header Section
+   -------------------------------------------------------------------------- */
+.restaurant-hero-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.restaurant-hero-title {
+    font-family: Fraunces, Georgia, serif;
+    font-size: 2.1rem;
+    font-weight: 700;
+    color: var(--wine-deep);
+    margin: 0 0 6px;
+    letter-spacing: -0.01em;
+}
+
+.restaurant-hero-lead {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.98rem;
+    line-height: 1.5;
+}
+
+.restaurant-hero-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* --------------------------------------------------------------------------
+   Live Notification Banner (Real-time Order alert)
+   -------------------------------------------------------------------------- */
+.live-alert-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    background: linear-gradient(90deg, #fff3e0 0%, #ffe0b2 100%);
+    border: 1.5px solid #ffb74d;
+    border-radius: 16px;
+    color: #e65100;
+    box-shadow: 0 6px 20px rgba(255, 152, 0, 0.18);
+    animation: slideDownBanner 0.35s ease;
+}
+
+.live-alert-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.live-alert-icon {
+    font-size: 1.4rem;
+    animation: ringBell 0.8s ease infinite alternate;
+}
+
+@keyframes slideDownBanner {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ringBell {
+    from { transform: rotate(-12deg); }
+    to { transform: rotate(12deg); }
+}
+
+/* --------------------------------------------------------------------------
+   Dashboard Stats Cards
+   -------------------------------------------------------------------------- */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 16px;
+}
+
+.stat-box {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 20px 22px;
+    box-shadow: 0 4px 18px rgba(43, 33, 28, 0.04);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-box:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(43, 33, 28, 0.08);
+}
+
+.stat-box::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--wine);
+    opacity: 0.4;
+}
+
+.stat-box.pending::before { background: #f57c00; opacity: 0.9; }
+.stat-box.confirmed::before { background: #2e7d32; opacity: 0.9; }
+.stat-box.rejected::before { background: #c62828; opacity: 0.8; }
+.stat-box.guests::before { background: var(--gold); opacity: 1; }
+
+.stat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.stat-label {
+    font-size: 0.85rem;
+    color: var(--muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin: 0;
+}
+
+.stat-icon {
+    font-size: 1.25rem;
+    opacity: 0.75;
+}
+
+.stat-value {
+    font-family: Fraunces, Georgia, serif;
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: var(--wine-deep);
+    margin: 4px 0 0;
+    line-height: 1;
+}
+
+.stat-box.pending .stat-value { color: #e65100; }
+.stat-box.confirmed .stat-value { color: #2e7d32; }
+.stat-box.rejected .stat-value { color: #c62828; }
+
+.stat-subtext {
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-top: 6px;
+}
+
+/* --------------------------------------------------------------------------
+   Filter & Control Bar
+   -------------------------------------------------------------------------- */
+.dashboard-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+    padding: 16px 20px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    box-shadow: 0 4px 16px rgba(43, 33, 28, 0.03);
+}
+
+.filter-pills-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+}
+
+.filter-pill {
+    padding: 8px 16px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.filter-pill:hover {
+    color: var(--wine);
+    border-color: var(--wine);
+}
+
+.filter-pill.active {
+    background: var(--wine);
+    color: var(--gold-soft);
+    border-color: var(--wine);
+    box-shadow: 0 3px 10px rgba(124, 45, 45, 0.2);
+}
+
+.filter-count {
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    background: rgba(0, 0, 0, 0.08);
+}
+
+.filter-pill.active .filter-count {
+    background: rgba(255, 255, 255, 0.25);
+    color: #fff;
+}
+
+.search-select-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.search-input-wrap {
+    position: relative;
+    min-width: 240px;
+}
+
+.search-input-wrap input {
+    width: 100%;
+    padding: 9px 14px 9px 34px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: #fff;
+    font-family: inherit;
+    font-size: 0.88rem;
+    color: var(--ink);
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+
+.search-input-wrap input:focus {
+    border-color: var(--wine);
+    box-shadow: 0 0 0 3px rgba(124, 45, 45, 0.1);
+}
+
+.search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.88rem;
+    color: var(--muted);
+    pointer-events: none;
+}
+
+.select-custom {
+    padding: 9px 14px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: #fff;
+    font-family: inherit;
+    font-size: 0.88rem;
+    color: var(--ink);
+    font-weight: 600;
+    outline: none;
+    cursor: pointer;
+}
+
+.select-custom:focus {
+    border-color: var(--wine);
+}
+
+/* --------------------------------------------------------------------------
+   Table & Reservation Data List
+   -------------------------------------------------------------------------- */
+.table-card {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+}
+
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.res-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 0.9rem;
+}
+
+.res-table thead th {
+    background: var(--cream);
+    padding: 16px 18px;
+    color: var(--wine-deep);
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1.5px solid var(--line);
+    white-space: nowrap;
+}
+
+.res-table tbody tr {
+    border-bottom: 1px solid var(--line);
+    transition: background-color 0.15s ease;
+}
+
+.res-table tbody tr:hover {
+    background-color: rgba(124, 45, 45, 0.025);
+}
+
+.res-table tbody tr.new-arrival {
+    animation: highlightNewRow 2s ease;
+}
+
+@keyframes highlightNewRow {
+    0% { background-color: #fff9c4; }
+    100% { background-color: transparent; }
+}
+
+.res-table td {
+    padding: 16px 18px;
+    vertical-align: middle;
+}
+
+/* Cell components */
+.res-code-cell {
+    font-family: monospace;
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--wine);
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.res-created-ago {
+    font-family: "Source Sans 3", sans-serif;
+    font-size: 0.72rem;
+    color: var(--muted);
+    font-weight: 500;
+}
+
+.res-cust-name {
+    font-weight: 700;
+    color: var(--ink);
+    font-size: 0.94rem;
+}
+
+.res-cust-contact {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 3px;
+    font-size: 0.8rem;
+    color: var(--muted);
+}
+
+.res-cust-phone {
+    color: var(--wine);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.res-cust-phone:hover {
+    text-decoration: underline;
+}
+
+.res-branch-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: var(--cream);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--wine-deep);
+}
+
+.res-table-badge {
+    margin-top: 3px;
+    font-size: 0.78rem;
+    color: var(--muted);
+    font-weight: 600;
+}
+
+.res-time-main {
+    font-weight: 700;
+    color: var(--wine-deep);
+}
+
+.res-time-date {
+    font-size: 0.78rem;
+    color: var(--muted);
+}
+
+.res-guests-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #fff;
+    border: 1px solid var(--line);
+    font-weight: 700;
+    font-size: 0.82rem;
+    color: var(--ink);
+}
+
+/* Dish & Request preview chips */
+.dish-chips-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    max-width: 240px;
+}
+
+.dish-chip {
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: #fff;
+    border: 1px solid var(--line);
+    font-size: 0.74rem;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+}
+
+.special-req-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+    font-size: 0.75rem;
+    color: #e65100;
+    background: #fff3e0;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+/* Actions in Table */
+.res-actions-cell {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.btn-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 7px 12px;
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+.btn-confirm-act {
+    background: #2e7d32;
+    color: #fff;
+}
+
+.btn-confirm-act:hover {
+    background: #1b5e20;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(46, 125, 50, 0.3);
+}
+
+.btn-reject-act {
+    background: #fff;
+    color: #c62828;
+    border: 1.5px solid #ffcdd2;
+}
+
+.btn-reject-act:hover {
+    background: #ffebee;
+    border-color: #c62828;
+    transform: translateY(-1px);
+}
+
+.btn-detail-act {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--line);
+}
+
+.btn-detail-act:hover {
+    background: var(--cream);
+    color: var(--wine);
+}
+
+/* Empty State */
+.table-empty-state {
+    padding: 48px 20px;
+    text-align: center;
+    color: var(--muted);
+}
+
+.table-empty-icon {
+    font-size: 3rem;
+    margin-bottom: 12px;
+    opacity: 0.6;
+}
+
+.table-empty-text {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--wine-deep);
+    margin: 0 0 4px;
+}
+
+.table-empty-sub {
+    font-size: 0.88rem;
+    margin: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Branch Management Page (branches.html)
+   -------------------------------------------------------------------------- */
+.branch-grid-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    align-items: start;
+}
+
+@media (max-width: 1024px) {
+    .branch-grid-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+.branch-list-col {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.branch-map-col {
+    position: sticky;
+    top: 96px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.branch-map-card {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+}
+
+.branch-map-header {
+    padding: 16px 20px;
+    background: var(--cream);
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.branch-map-title {
+    font-family: Fraunces, Georgia, serif;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--wine-deep);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#branches-main-map {
+    width: 100%;
+    height: 480px;
+    z-index: 10;
+}
+
+.branch-card-item {
+    background: var(--paper);
+    border: 1.5px solid var(--line);
+    border-radius: 20px;
+    padding: 22px;
+    box-shadow: 0 4px 16px rgba(43, 33, 28, 0.04);
+    transition: all 0.25s ease;
+    position: relative;
+}
+
+.branch-card-item:hover {
+    border-color: var(--wine);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(124, 45, 45, 0.08);
+}
+
+.branch-card-item.selected {
+    border-color: var(--wine);
+    box-shadow: 0 0 0 2px var(--wine);
+    background: #fffbf5;
+}
+
+.branch-item-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.branch-item-name {
+    font-family: Fraunces, Georgia, serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--wine-deep);
+    margin: 0 0 4px;
+}
+
+.branch-item-addr {
+    font-size: 0.88rem;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+}
+
+.branch-item-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    padding: 12px 14px;
+    background: var(--cream);
+    border-radius: 14px;
+    margin: 14px 0;
+}
+
+.branch-stat-mini {
+    text-align: center;
+}
+
+.branch-mini-val {
+    font-family: Fraunces, Georgia, serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--wine);
+    line-height: 1;
+}
+
+.branch-mini-val.avail {
+    color: #2e7d32;
+}
+
+.branch-mini-label {
+    font-size: 0.72rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-top: 3px;
+}
+
+.branch-capacity-bar {
+    width: 100%;
+    height: 6px;
+    background: rgba(124, 45, 45, 0.12);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-top: 8px;
+}
+
+.branch-capacity-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #2e7d32 0%, var(--gold) 100%);
+    border-radius: 999px;
+    transition: width 0.4s ease;
+}
+
+.branch-coords-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: monospace;
+    font-size: 0.78rem;
+    color: var(--muted);
+    background: #fff;
+    border: 1px dashed var(--line);
+    padding: 3px 8px;
+    border-radius: 6px;
+}
+
+.branch-item-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--line);
+}
+
+.branch-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* --------------------------------------------------------------------------
+   Modal Dialogs (Reject, Confirm, Details, Add/Edit Branch)
+   -------------------------------------------------------------------------- */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(43, 33, 28, 0.65);
+    backdrop-filter: blur(6px);
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    z-index: 1000;
+    overflow-y: auto;
+    animation: fadeInModal 0.25s ease;
+}
+
+.modal-overlay[hidden] {
+    display: none !important;
+}
+
+@keyframes fadeInModal {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.modal-window {
+    width: min(100%, 580px);
+    background: var(--paper);
+    border-radius: 24px;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+    position: relative;
+    border: 1px solid var(--line);
+    animation: zoomInModal 0.28s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.modal-window.large {
+    width: min(100%, 780px);
+}
+
+@keyframes zoomInModal {
+    from { opacity: 0; transform: scale(0.94); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.modal-head {
+    padding: 20px 24px;
+    background: var(--cream);
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.modal-title {
+    font-family: Fraunces, Georgia, serif;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--wine-deep);
+    margin: 0;
+}
+
+.modal-close-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    transition: background-color 0.2s;
+}
+
+.modal-close-btn:hover {
+    background: rgba(124, 45, 45, 0.1);
+    color: var(--wine);
+}
+
+.modal-body {
+    padding: 24px;
+    max-height: calc(85vh - 130px);
+    overflow-y: auto;
+}
+
+.modal-foot {
+    padding: 16px 24px;
+    background: var(--cream);
+    border-top: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+/* Modal Form styling */
+.form-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+@media (max-width: 600px) {
+    .form-grid-2 {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Coordinate Picker Map in Branch Modal */
+.coord-picker-box {
+    margin-top: 14px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: hidden;
+    background: #fff;
+}
+
+.coord-picker-head {
+    padding: 10px 14px;
+    background: var(--cream);
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--wine-deep);
+}
+
+#modal-picker-map {
+    width: 100%;
+    height: 240px;
+    z-index: 10;
+}
+
+.coord-picker-hint {
+    padding: 8px 12px;
+    font-size: 0.78rem;
+    color: var(--muted);
+    background: #fffbf5;
+    border-top: 1px dashed var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* Quick Reason Chips for Reject Modal */
+.reason-chips-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 8px 0 14px;
+}
+
+.reason-chip-btn {
+    padding: 5px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: #fff;
+    font-family: inherit;
+    font-size: 0.78rem;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.reason-chip-btn:hover {
+    border-color: var(--wine);
+    color: var(--wine);
+}
+
+.reason-chip-btn.active {
+    background: #ffebee;
+    border-color: #c62828;
+    color: #c62828;
+    font-weight: 600;
+}
+
+/* --------------------------------------------------------------------------
+   Responsive Media Queries
+   -------------------------------------------------------------------------- */
+@media (max-width: 900px) {
+    .restaurant-shell {
+        padding: 14px 16px 36px;
+    }
+
+    .restaurant-top-nav {
+        flex-direction: column;
+        align-items: stretch;
+        border-radius: 20px;
+        gap: 12px;
+        padding: 14px 18px;
+    }
+
+    .restaurant-nav-left {
+        justify-content: space-between;
+    }
+
+    .restaurant-nav-right {
+        justify-content: space-between;
+        flex-wrap: wrap;
+    }
+
+    .restaurant-hero-bar {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+/* ==========================================================================
+   CUSTOMER BOOKING SCREEN - LEAFLET MAP & TOP 5 NEAREST RESTAURANTS
+   ========================================================================== */
+.branch-map-top5-layout {
+    display: grid;
+    grid-template-columns: 1fr 370px;
+    gap: 20px;
+    align-items: stretch;
+    margin-top: 14px;
+}
+
+@media (max-width: 992px) {
+    .branch-map-top5-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+.branch-map-container-wrap {
+    display: flex;
+    flex-direction: column;
+    border-radius: 20px;
+    overflow: hidden;
+    border: 1.5px solid var(--line);
+    box-shadow: 0 4px 18px rgba(43, 33, 28, 0.06);
+    background: #fff;
+    min-height: 520px;
+}
+
+.booking-leaflet-map {
+    width: 100%;
+    height: 500px;
+    min-height: 460px;
+    z-index: 10;
+}
+
+.map-controls-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: #fffdfa;
+    border-top: 1px solid var(--line);
+    font-size: 0.82rem;
+    color: var(--muted);
+    flex-shrink: 0;
+}
+
+.branch-top5-sidebar {
+    display: flex;
+    flex-direction: column;
+    background: var(--cream);
+    border: 1.5px solid var(--line);
+    border-radius: 20px;
+    padding: 16px;
+    height: 560px;
+    box-shadow: 0 4px 18px rgba(43, 33, 28, 0.04);
+}
+
+.top5-sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    border-bottom: 1.5px solid var(--line);
+    flex-shrink: 0;
+}
+
+.top5-title-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.top5-header-icon {
+    font-size: 1.5rem;
+    line-height: 1;
+}
+
+.top5-header-title {
+    font-family: Fraunces, Georgia, serif;
+    font-size: 1.15rem;
+    color: var(--wine-deep);
+    margin: 0;
+}
+
+.top5-header-sub {
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin: 2px 0 0;
+}
+
+.top5-count-badge {
+    font-size: 0.76rem;
+    font-weight: 700;
+    color: var(--wine);
+    background: rgba(124, 45, 45, 0.1);
+    padding: 4px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.top5-restaurants-scroll {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow-y: auto;
+    padding-right: 6px;
+    flex: 1;
+}
+
+.top5-restaurants-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+.top5-restaurants-scroll::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 4px;
+}
+
+.top5-restaurants-scroll::-webkit-scrollbar-thumb {
+    background: rgba(124, 45, 45, 0.25);
+    border-radius: 4px;
+}
+
+.top5-restaurants-scroll::-webkit-scrollbar-thumb:hover {
+    background: var(--wine);
+}
+
+.top5-card-item {
+    background: #fff;
+    border: 1.5px solid var(--line);
+    border-radius: 16px;
+    padding: 12px;
+    transition: all 0.22s ease;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: relative;
+    box-shadow: 0 2px 8px rgba(43, 33, 28, 0.04);
+}
+
+.top5-card-item:hover {
+    border-color: var(--gold);
+    box-shadow: 0 6px 18px rgba(43, 33, 28, 0.09);
+    transform: translateY(-2px);
+}
+
+.top5-card-item.highlighted {
+    border-color: #d4a373;
+    box-shadow: 0 0 0 2px #d4a373, 0 8px 20px rgba(196, 165, 116, 0.25);
+    background: #fffdf9;
+}
+
+.top5-card-item.selected {
+    border-color: var(--wine);
+    box-shadow: 0 0 0 2px var(--wine), 0 8px 24px rgba(124, 45, 45, 0.18);
+    background: #fffbf5;
+}
+
+.top5-card-header {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.top5-rank-badge {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--wine);
+    color: var(--gold-soft);
+    font-family: Fraunces, Georgia, serif;
+    font-size: 0.78rem;
+    font-weight: 700;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+}
+
+.top5-card-thumb {
+    width: 60px;
+    height: 60px;
+    border-radius: 10px;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: #eedcb8;
+}
+
+.top5-card-meta {
+    flex: 1;
+    min-width: 0;
+}
+
+.top5-card-name {
+    font-family: Fraunces, Georgia, serif;
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: var(--wine-deep);
+    margin: 0 0 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.top5-card-cuisine {
+    font-size: 0.74rem;
+    color: var(--gold);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.top5-card-rating {
+    font-size: 0.78rem;
+    color: var(--wine-deep);
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.top5-card-details {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    padding-top: 6px;
+    border-top: 1px dashed var(--line);
+}
+
+.top5-card-distance {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 700;
+    color: var(--wine-deep);
+    background: rgba(196, 165, 116, 0.18);
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+}
+
+.top5-card-tables {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.76rem;
+    font-weight: 700;
+}
+
+.top5-card-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 2px;
+}
+
+.btn-select-branch {
+    flex: 1;
+    padding: 7px 12px;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    border: 1.5px solid var(--wine);
+    background: var(--wine);
+    color: var(--gold-soft);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+}
+
+.btn-select-branch:hover {
+    background: var(--wine-deep);
+    border-color: var(--wine-deep);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(124, 45, 45, 0.25);
+}
+
+.top5-card-item.selected .btn-select-branch {
+    background: #2e7d32;
+    border-color: #2e7d32;
+    color: #fff;
+}
+
+.branch-selected-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(46, 125, 50, 0.12);
+    border: 1px solid rgba(46, 125, 50, 0.3);
+    color: #2e7d32;
+    font-size: 0.84rem;
+    font-weight: 700;
+    padding: 5px 14px;
+    border-radius: 999px;
+}
+
+/* Leaflet Custom Marker & Highlight Animation */
+.booking-map-marker {
+    transition: transform 0.25s ease;
+}
+
+.booking-marker-pin {
+    width: 34px;
+    height: 34px;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(43, 33, 28, 0.4);
+    border: 2px solid #fff;
+    background: linear-gradient(135deg, #7c2d2d 0%, #5c1f22 100%);
+    color: #e8d5b5;
+    transition: all 0.25s ease;
+}
+
+.booking-marker-pin span {
+    transform: rotate(45deg);
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.booking-marker-pin.active,
+.booking-marker-pin.selected {
+    background: linear-gradient(135deg, #d4a373 0%, #a26b38 100%);
+    color: #fff;
+    transform: rotate(-45deg) scale(1.18);
+    box-shadow: 0 0 0 4px rgba(212, 163, 115, 0.4), 0 6px 16px rgba(43, 33, 28, 0.45);
+    animation: markerPulse 1.8s infinite;
+}
+
+@keyframes markerPulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(212, 163, 115, 0.7), 0 6px 16px rgba(43, 33, 28, 0.45);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(212, 163, 115, 0), 0 6px 16px rgba(43, 33, 28, 0.45);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(212, 163, 115, 0), 0 6px 16px rgba(43, 33, 28, 0.45);
+    }
+}
+
+/* Leaflet Popup Content Styling */
+.booking-popup-card {
+    font-family: 'Source Sans 3', sans-serif;
+    min-width: 220px;
+    padding: 2px;
+}
+
+.booking-popup-thumb {
+    width: 100%;
+    height: 90px;
+    border-radius: 8px;
+    object-fit: cover;
+    margin-bottom: 8px;
+}
+
+.booking-popup-title {
+    font-family: Fraunces, Georgia, serif;
+    font-size: 1.05rem;
+    color: #5c1f22;
+    margin: 0 0 2px;
+    font-weight: 700;
+}
+
+.booking-popup-addr {
+    font-size: 0.8rem;
+    color: #6f625a;
+    margin: 0 0 6px;
+    line-height: 1.35;
+}
+
+.booking-popup-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.78rem;
+    margin-bottom: 10px;
+    background: #f7f1e8;
+    padding: 6px 8px;
+    border-radius: 6px;
+}
+
+.btn-popup-select-branch {
+    width: 100%;
+    padding: 6px 12px;
+    background: #7c2d2d;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-popup-select-branch:hover {
+    background: #5c1f22;
+}
+
+.btn-popup-select-branch.is-selected {
+    background: #2e7d32;
+}
+
