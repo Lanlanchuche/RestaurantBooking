@@ -9,98 +9,7 @@
  */
 
 // Danh sách các chi nhánh (có thể load từ API)
-let currentBranches = [
-    {
-        id: 1,
-        restaurantName: "Le Ciel Gourmet",
-        name: "Chi nhánh Bến Nghé — Quận 1",
-        address: "72 Lê Thánh Tôn, P. Bến Nghé, Quận 1, TP. HCM",
-        cuisine: "Ẩm thực Pháp & Âu Hiện Đại",
-        rating: 4.9,
-        reviewsCount: 328,
-        distanceKm: 0.8,
-        durationMin: 3,
-        totalTables: 12,
-        availableTables: 5,
-        lat: 10.7769,
-        lng: 106.7009
-    },
-    {
-        id: 2,
-        restaurantName: "Hoàng Gia Cuisine",
-        name: "Chi nhánh Nguyễn Huệ — Quận 1",
-        address: "98 Nguyễn Huệ, P. Bến Nghé, Quận 1, TP. HCM",
-        cuisine: "Cơm Cung Đình & Hương Vị Việt",
-        rating: 4.8,
-        reviewsCount: 370,
-        distanceKm: 1.1,
-        durationMin: 4,
-        totalTables: 15,
-        availableTables: 7,
-        lat: 10.7735,
-        lng: 106.7042
-    },
-    {
-        id: 3,
-        restaurantName: "The Olive Tree Dining",
-        name: "Chi nhánh Pasteur — Quận 3",
-        address: "215 Pasteur, P. Võ Thị Sáu, Quận 3, TP. HCM",
-        cuisine: "Địa Trung Hải & Steak Thượng Hạng",
-        rating: 4.9,
-        reviewsCount: 286,
-        distanceKm: 1.5,
-        durationMin: 5,
-        totalTables: 14,
-        availableTables: 6,
-        lat: 10.7832,
-        lng: 106.6931
-    },
-    {
-        id: 4,
-        restaurantName: "Nhà Hàng Hương Sen",
-        name: "Chi nhánh Thảo Điền — TP. Thủ Đức",
-        address: "18 Xuân Thủy, P. Thảo Điền, TP. Thủ Đức, TP. HCM",
-        cuisine: "Ẩm thực Á Đông & Hải Sản Sống",
-        rating: 4.8,
-        reviewsCount: 245,
-        distanceKm: 2.4,
-        durationMin: 7,
-        totalTables: 10,
-        availableTables: 3,
-        lat: 10.8035,
-        lng: 106.7324
-    },
-    {
-        id: 5,
-        restaurantName: "Sora & Umi Japanese Dining",
-        name: "Chi nhánh Landmark 81 — Bình Thạnh",
-        address: "Tầng 5, Vincom Landmark 81, 720A Điện Biên Phủ, Bình Thạnh, TP. HCM",
-        cuisine: "Omakase & Sushi Tinh Hoa Nhật Bản",
-        rating: 5.0,
-        reviewsCount: 412,
-        distanceKm: 3.1,
-        durationMin: 9,
-        totalTables: 8,
-        availableTables: 4,
-        lat: 10.7951,
-        lng: 106.7218
-    },
-    {
-        id: 6,
-        restaurantName: "Bếp Quê Signature",
-        name: "Chi nhánh Phú Mỹ Hưng — Quận 7",
-        address: "102 Nguyễn Đức Cảnh, P. Tân Phong, Quận 7, TP. HCM",
-        cuisine: "Cơm Niêu & Món Ngon 3 Miền",
-        rating: 4.7,
-        reviewsCount: 194,
-        distanceKm: 5.2,
-        durationMin: 14,
-        totalTables: 14,
-        availableTables: 2,
-        lat: 10.7291,
-        lng: 106.7099
-    }
-];
+let currentBranches = [];
 
 // Trạng thái đơn đặt chỗ hiện tại
 const bookingState = {
@@ -283,12 +192,13 @@ function initBookingMap() {
             })
         }).bindPopup("<b>Vị trí của bạn</b>").addTo(bookingMap);
         
-        // Căn bản đồ hiển thị được cả user và top 5
-        const group = new L.featureGroup([
-            L.marker([bookingState.userLat, bookingState.userLng]),
-            ...top5.map(b => L.marker([b.lat, b.lng]))
-        ]);
-        bookingMap.fitBounds(group.getBounds(), { padding: [50, 50] });
+        // Căn bản đồ hiển thị được cả user và top 5 nếu có
+        const features = [L.marker([bookingState.userLat, bookingState.userLng])];
+        if (top5 && top5.length > 0) {
+            features.push(...top5.map(b => L.marker([b.lat, b.lng])));
+        }
+        const group = new L.featureGroup(features);
+        bookingMap.fitBounds(group.getBounds(), { padding: [50, 50], maxZoom: 14 });
     }
 
     // Nút Toàn cảnh (Recenter Map)
@@ -312,7 +222,18 @@ function initBookingMap() {
 function fitAllBranchesOnMap() {
     if (!bookingMap) return;
     const top5 = getTop5Branches();
+    
+    if (top5.length === 0) {
+        if (bookingState.userLat && bookingState.userLng) {
+            bookingMap.setView([bookingState.userLat, bookingState.userLng], 14);
+        }
+        return;
+    }
+    
     const latLngs = top5.map((b) => [b.lat, b.lng]);
+    if (bookingState.userLat && bookingState.userLng) {
+        latLngs.push([bookingState.userLat, bookingState.userLng]);
+    }
     const bounds = L.latLngBounds(latLngs);
     bookingMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
 }
@@ -370,6 +291,16 @@ function renderTop5Branches(branchesList) {
     if (!container) return;
 
     container.innerHTML = "";
+
+    if (!branchesList || branchesList.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px 20px; color: var(--muted); border: 1px dashed var(--line); border-radius: 8px;">
+                <span style="font-size: 2rem; display: block; margin-bottom: 12px;">📍</span>
+                <p style="margin: 0;">Vui lòng nhập địa chỉ hoặc ấn Lấy vị trí để tìm các nhà hàng gần bạn nhất.</p>
+            </div>
+        `;
+        return;
+    }
 
     branchesList.forEach((branch, idx) => {
         const isSelected = bookingState.selectedBranch?.id === branch.id;
@@ -697,10 +628,28 @@ async function handleBookingSubmit() {
     try {
         let resultReservation = null;
 
-        // Gửi tới backend API nếu có
+        // Gửi tới backend API
         try {
-            resultReservation = await api.post("/customer/reservations", reservationPayload);
-        } catch {
+            const apiRes = await api.post("/customer/reservations", reservationPayload);
+            
+            // Map dữ liệu từ backend sang format frontend mong muốn
+            resultReservation = {
+                id: apiRes.id,
+                branch_id: apiRes.branch_id,
+                branch_name: apiRes.branch?.name,
+                restaurant_name: apiRes.branch?.name,
+                branch_address: apiRes.branch?.address,
+                reservation_time: `${bookingState.time} • ${formatDateVi(bookingState.date)}`,
+                raw_time: apiRes.reservation_time,
+                guest_count: apiRes.guest_count,
+                table_number: apiRes.table_number || Math.floor(1 + Math.random() * 12),
+                customer_name: apiRes.customer?.full_name || custName,
+                customer_phone: apiRes.customer?.phone || custPhone,
+                status: apiRes.status,
+                created_at: apiRes.created_at
+            };
+        } catch (err) {
+            console.error("API error, using local fallback", err);
             // Backend offline hoặc chưa có API -> Demo mode lưu vào localStorage
             const randCode = "TR-" + Math.floor(100000 + Math.random() * 900000);
             resultReservation = {
@@ -757,8 +706,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // 3. Khởi tạo Top 5 chi nhánh và mặc định chọn chi nhánh đầu tiên
     const top5 = getTop5Branches();
-    bookingState.selectedBranch = top5[0];
-    activeHighlightedBranchId = top5[0].id;
+    if (top5.length > 0) {
+        bookingState.selectedBranch = top5[0];
+        activeHighlightedBranchId = top5[0].id;
+    } else {
+        bookingState.selectedBranch = null;
+        activeHighlightedBranchId = null;
+    }
     renderTop5Branches(top5);
 
     // 4. Khởi tạo Leaflet Map
@@ -927,8 +881,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 showToast("Bạn chưa cập nhật địa chỉ ở phần Thông tin cá nhân. Vui lòng cập nhật trước hoặc tự nhập tay.", "danger");
             } else {
                 userLocInput.value = user.address;
-                filterBranches(user.address);
-                showToast("Đã lấy địa chỉ mặc định thành công!", "success");
+                const btnConfirm = document.getElementById("btn-confirm-address");
+                if (btnConfirm) {
+                    btnConfirm.click(); // Trigger geocoding and API call
+                }
+                showToast("Đang tìm nhà hàng gần địa chỉ mặc định...", "success");
             }
         });
     }

@@ -53,25 +53,53 @@ const DEFAULT_SAMPLE_RESERVATIONS = [
 let reservations = [];
 let currentFilter = "ALL";
 
-function getLocalReservations() {
+function formatDateVi(dateStr) {
+    if (!dateStr) return "--";
     try {
-        const stored = localStorage.getItem("customer_reservations");
-        if (stored) {
-            const parsed = JSON.parse(stored);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-                return parsed;
-            }
-        }
+        const d = new Date(dateStr);
+        const days = ["Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
+        const dayName = days[d.getDay()];
+        const day = String(d.getDate()).padStart(2, "0");
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const year = d.getFullYear();
+        const hours = String(d.getHours()).padStart(2, "0");
+        const mins = String(d.getMinutes()).padStart(2, "0");
+        return `${hours}:${mins} • ${dayName}, ${day}/${month}/${year}`;
     } catch {
-        // Fallback
+        return dateStr;
     }
-    // Khởi tạo dữ liệu mẫu nếu chưa có
-    localStorage.setItem("customer_reservations", JSON.stringify(DEFAULT_SAMPLE_RESERVATIONS));
-    return DEFAULT_SAMPLE_RESERVATIONS;
 }
 
-function saveLocalReservations(data) {
-    localStorage.setItem("customer_reservations", JSON.stringify(data));
+async function loadReservationsFromApi() {
+    try {
+        setLoading(true, "Đang tải lịch sử đặt bàn...");
+        const data = await api.get("/customer/reservations?limit=50");
+        if (Array.isArray(data)) {
+            reservations = data.map(item => ({
+                id: item.id,
+                branch_id: item.branch_id,
+                branch_name: item.branch?.name,
+                restaurant_name: item.branch?.name,
+                branch_address: item.branch?.address,
+                reservation_time: formatDateVi(item.reservation_time),
+                raw_time: item.reservation_time,
+                guest_count: item.guest_count,
+                table_number: item.table_number,
+                customer_name: item.customer?.full_name,
+                customer_phone: item.customer?.phone,
+                status: item.status,
+                special_requests: item.special_request,
+                created_at: item.created_at
+            }));
+        } else {
+            reservations = [];
+        }
+    } catch (err) {
+        showToast("Lỗi khi tải lịch sử đặt bàn.", "danger");
+        reservations = [];
+    } finally {
+        setLoading(false);
+    }
 }
 
 function updateStats(list) {
@@ -235,8 +263,8 @@ function renderReservationsList() {
     });
 }
 
-function handleCancel(id) {
-    const item = reservations.find((r) => r.id === id);
+async function handleCancel(id) {
+    const item = reservations.find((r) => r.id == id);
     if (!item) return;
 
     const check = canCancelReservation(item);
@@ -248,15 +276,22 @@ function handleCancel(id) {
     const confirmCancel = confirm(`Bạn có chắc chắn muốn hủy đặt bàn tại ${item.restaurant_name || item.branch_name} (Mã: ${item.id}) không?`);
     if (!confirmCancel) return;
 
-    item.status = "CANCELLED";
-    saveLocalReservations(reservations);
-    updateStats(reservations);
-    renderReservationsList();
-
-    showToast(`Đã hủy đặt bàn mã ${item.id} thành công. Bàn đã được hoàn lại cho chi nhánh.`, "success");
+    try {
+        setLoading(true, "Đang xử lý hủy đặt bàn...");
+        await api.patch(`/customer/reservations/${item.id}/cancel`);
+        
+        item.status = "CANCELLED";
+        updateStats(reservations);
+        renderReservationsList();
+        showToast(`Đã hủy đặt bàn mã ${item.id} thành công.`, "success");
+    } catch (err) {
+        showToast(err.message || "Lỗi khi hủy đặt bàn.", "danger");
+    } finally {
+        setLoading(false);
+    }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
     const user = requireAuth("CUSTOMER");
     if (!user) return;
 
@@ -272,7 +307,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Tải dữ liệu đặt bàn
-    reservations = getLocalReservations();
+    await loadReservationsFromApi();
     updateStats(reservations);
     renderReservationsList();
 

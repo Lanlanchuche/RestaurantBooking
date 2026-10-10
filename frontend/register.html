@@ -77,6 +77,18 @@
                         <input id="email" name="email" type="email" autocomplete="email" required placeholder="ban@email.com">
                     </div>
 
+                    <!-- Customer specific fields (toggled when role is CUSTOMER) -->
+                    <div id="customer-fields" class="customer-fields">
+                        <div class="form-group">
+                            <label for="phone">Số điện thoại</label>
+                            <input id="phone" name="phone" type="tel" autocomplete="tel" placeholder="0901 234 567 (tùy chọn)">
+                        </div>
+                        <div class="form-group">
+                            <label for="address">Địa chỉ</label>
+                            <input id="address" name="address" type="text" autocomplete="street-address" placeholder="Ví dụ: 72 Lê Thánh Tôn, Quận 1 (tùy chọn)">
+                        </div>
+                    </div>
+
                     <div class="form-group">
                         <label for="password">Mật khẩu <span class="required-mark">*</span></label>
                         <div class="password-field">
