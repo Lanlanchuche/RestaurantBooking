@@ -84,8 +84,8 @@
                                 <label for="user-location-input" style="font-weight: 600; color: var(--wine-deep); margin-bottom: 4px;">Vị trí của bạn</label>
                                 <div style="display: flex; gap: 8px; width: 100%;">
                                     <input type="text" id="user-location-input" class="branch-search-input" placeholder="Nhập địa chỉ..." style="flex: 1; border: 1px solid var(--line); border-radius: 4px; padding: 10px;">
-                                    <button type="button" id="btn-recenter-map" class="btn-gps-action" title="Toàn cảnh" style="border-radius: 4px; padding: 0 16px;">
-                                        Toàn cảnh
+                                    <button type="button" id="btn-confirm-address" class="btn-primary" style="border-radius: 4px; padding: 0 16px;">
+                                        Xác nhận
                                     </button>
                                 </div>
 
@@ -93,8 +93,11 @@
                                     <button type="button" id="btn-get-location" class="btn-ghost" style="flex: 1; border-radius: 4px; padding: 10px;">
                                         Lấy vị trí hiện tại
                                     </button>
-                                    <button type="button" id="btn-default-location" class="btn-primary" style="flex: 1; border-radius: 4px; padding: 10px;">
+                                    <button type="button" id="btn-default-location" class="btn-ghost" style="flex: 1; border-radius: 4px; padding: 10px;">
                                         Dùng địa chỉ mặc định
+                                    </button>
+                                    <button type="button" id="btn-recenter-map" class="btn-gps-action" title="Toàn cảnh" style="border-radius: 4px; padding: 0 16px;">
+                                        Toàn cảnh
                                     </button>
                                 </div>
                             </div>

@@ -49,6 +49,10 @@ class UserResponse(UserBase):
     """Schema chung cho User, trả về từ API /auth/me."""
     id: int
     created_at: datetime
+    name: str = "Khách"
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    
     
     # Cấu hình Pydantic v2 thay thế cho orm_mode=True
     model_config = ConfigDict(from_attributes=True)

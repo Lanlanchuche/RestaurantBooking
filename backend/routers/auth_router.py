@@ -12,6 +12,12 @@ class UserLogin(BaseModel):
     email: str
     password: str
 
+class UserUpdateMe(BaseModel):
+    name: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    address: str | None = None
+
 class UserCreate(BaseModel):
     name: str
     email: str
@@ -20,6 +26,8 @@ class UserCreate(BaseModel):
     restaurant_name: str | None = None
     restaurant_email: str | None = None
     restaurant_phone: str | None = None
+    customer_phone: str | None = None
+    customer_address: str | None = None
 
 @router.post("/register", response_model=schemas.UserResponse, status_code=201)
 def register(user_in: UserCreate, db: Session = Depends(get_db)):
@@ -51,6 +59,8 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
         cus_profile = models.Customer(
             user_id=new_user.id,
             full_name=user_in.name,
+            phone=user_in.customer_phone,
+            address=user_in.customer_address
         )
         db.add(cus_profile)
     
@@ -61,25 +71,122 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
 def login(user_credentials: UserLogin, db: Session = Depends(get_db)):
     """Đăng nhập và nhận JWT access token."""
     user = db.query(models.User).filter(models.User.email == user_credentials.email).first()
-    if not user or not auth.verify_password(user_credentials.password, user.password_hash):
+    if not user or not auth.verify_password(user_credentials.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email hoặc mật khẩu không chính xác."
         )
         
     access_token = auth.create_access_token(data={"sub": user.email, "role": user.role.value if hasattr(user.role, 'value') else user.role})
+    # Lấy tên từ profile tương ứng
+    user_name = "Khách"
+    user_phone = None
+    user_address = None
+    if user.role == models.UserRole.CUSTOMER and user.customer_profile:
+        user_name = user.customer_profile.full_name
+        user_phone = user.customer_profile.phone
+        user_address = user.customer_profile.address
+    elif user.role == models.UserRole.RESTAURANT_OWNER and user.restaurant_profile:
+        user_name = user.restaurant_profile.name
+        user_phone = user.restaurant_profile.phone if hasattr(user.restaurant_profile, 'phone') else None
+        user_address = user.restaurant_profile.address
+
     return {
         "access_token": access_token, 
         "token_type": "bearer", 
         "user": {
             "id": user.id, 
             "email": user.email, 
-            "role": user.role, 
-            "name": user.name
+            "role": user.role.value if hasattr(user.role, 'value') else user.role, 
+            "name": user_name,
+            "phone": user_phone,
+            "address": user_address
         }
     }
 
 @router.get("/me", response_model=schemas.UserResponse)
 def read_users_me(current_user: models.User = Depends(get_current_user)):
     """Lấy thông tin profile của user đang đăng nhập."""
-    return current_user
+    user_name = "Khách"
+    user_phone = None
+    user_address = None
+    if current_user.role == models.UserRole.CUSTOMER and current_user.customer_profile:
+        user_name = current_user.customer_profile.full_name
+        user_phone = current_user.customer_profile.phone
+        user_address = current_user.customer_profile.address
+    elif current_user.role == models.UserRole.RESTAURANT_OWNER and current_user.restaurant_profile:
+        user_name = current_user.restaurant_profile.name
+        user_phone = current_user.restaurant_profile.phone if hasattr(current_user.restaurant_profile, 'phone') else None
+        user_address = current_user.restaurant_profile.address
+
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "role": current_user.role.value if hasattr(current_user.role, 'value') else current_user.role,
+        "is_active": current_user.is_active,
+        "created_at": current_user.created_at,
+        "name": user_name,
+        "phone": user_phone,
+        "address": user_address
+    }
+
+@router.put("/me")
+def update_users_me(
+    payload: UserUpdateMe,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Cập nhật thông tin profile của user đang đăng nhập."""
+    if payload.email:
+        existing_user = db.query(models.User).filter(models.User.email == payload.email, models.User.id != current_user.id).first()
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Email này đã được sử dụng.")
+        current_user.email = payload.email
+
+    if current_user.role == models.UserRole.CUSTOMER and current_user.customer_profile:
+        if payload.name is not None:
+            current_user.customer_profile.full_name = payload.name
+        if payload.phone is not None:
+            current_user.customer_profile.phone = payload.phone
+        if payload.address is not None:
+            current_user.customer_profile.address = payload.address
+            
+    elif current_user.role == models.UserRole.RESTAURANT_OWNER and current_user.restaurant_profile:
+        if payload.name is not None:
+            current_user.restaurant_profile.name = payload.name
+        if payload.address is not None:
+            current_user.restaurant_profile.address = payload.address
+
+    db.commit()
+    db.refresh(current_user)
+    
+    user_name = "Khách"
+    user_phone = None
+    user_address = None
+    if current_user.role == models.UserRole.CUSTOMER and current_user.customer_profile:
+        user_name = current_user.customer_profile.full_name
+        user_phone = current_user.customer_profile.phone
+        user_address = current_user.customer_profile.address
+    elif current_user.role == models.UserRole.RESTAURANT_OWNER and current_user.restaurant_profile:
+        user_name = current_user.restaurant_profile.name
+        user_phone = current_user.restaurant_profile.phone if hasattr(current_user.restaurant_profile, 'phone') else None
+        user_address = current_user.restaurant_profile.address
+
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "role": current_user.role.value if hasattr(current_user.role, 'value') else current_user.role,
+        "name": user_name,
+        "phone": user_phone,
+        "address": user_address
+    }
+
+@router.delete("/me")
+def delete_users_me(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Xóa tài khoản của user đang đăng nhập."""
+    db.delete(current_user)
+    db.commit()
+    return {"detail": "Tài khoản đã được xóa thành công"}
