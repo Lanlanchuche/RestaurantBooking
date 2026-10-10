@@ -84,10 +84,15 @@ function setDeleteModalOpen(open) {
 }
 
 async function loadCurrentUser(sessionUser) {
+    const token = getToken();
+    if (!token || token === "demo-session-token") {
+        return normalizeUser(sessionUser);
+    }
+
     try {
         const remoteUser = await api.get("/auth/me");
         const user = normalizeUser(remoteUser, sessionUser);
-        setAuthData(getToken(), user);
+        setAuthData(token, user);
         return user;
     } catch {
         return normalizeUser(sessionUser);
@@ -149,12 +154,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         try {
             let updated = payload;
-            try {
-                updated = await api.put("/auth/me", payload);
-            } catch (err) {
-                const cannotReachServer = /Không kết nối được máy chủ/.test(err.message || "");
-                if (!cannotReachServer && !/404|405|không thành công/i.test(err.message || "")) {
-                    throw err;
+            
+            if (getToken() !== "demo-session-token") {
+                try {
+                    updated = await api.put("/auth/me", payload);
+                } catch (err) {
+                    const cannotReachServer = /Không kết nối được máy chủ/.test(err.message || "");
+                    if (!cannotReachServer && !/404|405|không thành công/i.test(err.message || "")) {
+                        throw err;
+                    }
                 }
             }
 
@@ -186,10 +194,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         setLoading(true, "Đang xoá tài khoản...");
 
         try {
-            try {
-                await api.delete("/auth/me");
-            } catch {
-                // Backend chưa có endpoint xoá; vẫn gỡ phiên trên trình duyệt.
+            if (getToken() !== "demo-session-token") {
+                try {
+                    await api.delete("/auth/me");
+                } catch {
+                    // Backend chưa có endpoint xoá; vẫn gỡ phiên trên trình duyệt.
+                }
             }
 
             clearAuth();

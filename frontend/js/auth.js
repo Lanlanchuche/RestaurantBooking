@@ -43,9 +43,10 @@ function dashboardHref(role) {
     const isSubdir = location.pathname.includes("/customer/") || location.pathname.includes("/restaurant/");
     const prefix = isSubdir ? "../" : "";
     const normalizedRole = String(role || "").toUpperCase();
-    return (normalizedRole === "RESTAURANT_OWNER" || normalizedRole === "OWNER" || normalizedRole === "RESTAURANT")
-        ? `${prefix}restaurant/dashboard.html`
-        : `${prefix}customer/dashboard.html`;
+    if (normalizedRole.includes("RESTAURANT") || normalizedRole.includes("OWNER")) {
+        return `${prefix}restaurant/dashboard.html`;
+    }
+    return `${prefix}customer/dashboard.html`;
 }
 
 function requireAuth(requiredRole = "CUSTOMER") {
