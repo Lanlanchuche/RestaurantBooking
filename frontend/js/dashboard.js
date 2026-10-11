@@ -33,74 +33,7 @@ let _soundEnabled = true;
 // Active action targets for modals
 let _selectedReservation = null;
 
-// Default sample reservations for offline demonstration
-const DEFAULT_RESTAURANT_RESERVATIONS = [
-    {
-        id: "TR-892415",
-        branch_id: 1,
-        branch_name: "Chi nhánh Bến Nghé — Quận 1",
-        restaurant_name: "Le Ciel Gourmet",
-        branch_address: "72 Lê Thánh Tôn, P. Bến Nghé, Quận 1, TP. HCM",
-        reservation_time: "19:00 • Thứ Bảy, 17/10/2026",
-        raw_time: "2026-10-17T19:00:00",
-        guest_count: 2,
-        seating_area: "Gần cửa sổ",
-        table_number: 4,
-        customer_name: "Nguyễn Minh Khang",
-        customer_phone: "0909 123 456",
-        customer_email: "minhkhang@tablereserve.vn",
-        status: "CONFIRMED",
-        pre_ordered_dishes: [
-            { name: "Bò Wagyu A5 sốt tiêu đen thượng hạng", quantity: 1, price: 590000 },
-            { name: "Set tráng miệng Tinh hoa bánh ngọt Pháp", quantity: 1, price: 180000 }
-        ],
-        special_requests: "🎂 Trang trí sinh nhật. Chuẩn bị nến & hoa tươi",
-        created_at: new Date(Date.now() - 3600000 * 2).toISOString()
-    },
-    {
-        id: "TR-674120",
-        branch_id: 2,
-        branch_name: "Chi nhánh Thảo Điền — TP. Thủ Đức",
-        restaurant_name: "Le Ciel Gourmet",
-        branch_address: "18 Xuân Thủy, Thảo Điền, TP. Thủ Đức, TP. HCM",
-        reservation_time: "12:30 • Chủ Nhật, 18/10/2026",
-        raw_time: "2026-10-18T12:30:00",
-        guest_count: 4,
-        seating_area: "Sân vườn ngoài trời",
-        table_number: 8,
-        customer_name: "Trần Bảo Ngọc",
-        customer_phone: "0912 888 999",
-        customer_email: "baongoc.tran@gmail.com",
-        status: "PENDING",
-        pre_ordered_dishes: [
-            { name: "Tôm hùm Alaska bỏ lò phô mai Gruyère", quantity: 1, price: 720000 }
-        ],
-        special_requests: "👶 Chuẩn bị 01 ghế trẻ em",
-        created_at: new Date(Date.now() - 1000 * 60 * 15).toISOString()
-    },
-    {
-        id: "TR-553109",
-        branch_id: 1,
-        branch_name: "Chi nhánh Bến Nghé — Quận 1",
-        restaurant_name: "Le Ciel Gourmet",
-        branch_address: "72 Lê Thánh Tôn, P. Bến Nghé, Quận 1, TP. HCM",
-        reservation_time: "20:00 • Tối nay",
-        raw_time: new Date(Date.now() + 3600000 * 3).toISOString(),
-        guest_count: 6,
-        seating_area: "Phòng VIP riêng tư",
-        table_number: 12,
-        customer_name: "Lê Hoàng Long",
-        customer_phone: "0938 776 543",
-        customer_email: "long.le@financecorp.vn",
-        status: "PENDING",
-        pre_ordered_dishes: [
-            { name: "Vịt quay sốt mận & bánh bao chiên giòn", quantity: 2, price: 380000 },
-            { name: "Cá hồi Na Uy áp chảo sốt bơ chanh dây", quantity: 2, price: 420000 }
-        ],
-        special_requests: "🍾 Khách mang theo 1 chai vang đỏ, xin hỗ trợ ướp lạnh ly pha lê.",
-        created_at: new Date(Date.now() - 1000 * 60 * 5).toISOString()
-    }
-];
+
 
 // ==========================================================================
 // HELPER UTILITIES
@@ -420,13 +353,9 @@ async function loadReservations() {
     try {
         // Thử lấy từ Backend REST API thật theo spec
         const data = await api.get("/restaurant/me/reservations");
-        if (Array.isArray(data) && data.length > 0) {
-            _reservations = data;
-        } else {
-            _reservations = getFallbackReservations();
-        }
+        _reservations = Array.isArray(data) ? data : [];
     } catch {
-        // Khi backend chưa chạy, fallback mượt mà về dữ liệu đã lưu
+        // Khi backend chưa chạy, fallback về dữ liệu đã lưu trong localStorage
         _reservations = getFallbackReservations();
     } finally {
         setLoading(false);
@@ -436,31 +365,21 @@ async function loadReservations() {
 }
 
 /**
- * Lấy danh sách từ LocalStorage kết hợp mock mẫu
+ * Lấy danh sách từ LocalStorage (không dùng data mẫu)
  */
 function getFallbackReservations() {
     try {
         const stored = localStorage.getItem("customer_reservations");
         if (stored) {
             const parsed = JSON.parse(stored);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-                // Hợp nhất dữ liệu mẫu nếu danh sách hiện có ít
-                const ids = new Set(parsed.map((x) => x.id));
-                const combined = [...parsed];
-                for (const item of DEFAULT_RESTAURANT_RESERVATIONS) {
-                    if (!ids.has(item.id)) {
-                        combined.push(item);
-                    }
-                }
-                return combined;
+            if (Array.isArray(parsed)) {
+                return parsed;
             }
         }
     } catch {
         // Ignore fallback parse error
     }
-    // Ghi dữ liệu mẫu mặc định
-    localStorage.setItem("customer_reservations", JSON.stringify(DEFAULT_RESTAURANT_RESERVATIONS));
-    return DEFAULT_RESTAURANT_RESERVATIONS;
+    return [];
 }
 
 /**
@@ -800,7 +719,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const ownerAvatarEl = document.getElementById("owner-avatar");
 
     if (ownerNameEl) ownerNameEl.textContent = displayName(currentUser);
-    if (ownerRestEl) ownerRestEl.textContent = currentUser.restaurant_name || "Le Ciel Gourmet";
+    if (ownerRestEl) ownerRestEl.textContent = currentUser.restaurant_name || "";
     if (ownerAvatarEl) {
         const nameInitial = (currentUser.name || "QL").substring(0, 2).toUpperCase();
         ownerAvatarEl.textContent = nameInitial;
