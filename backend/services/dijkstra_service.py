@@ -48,10 +48,15 @@ def _haversine(
     """
     earth_radius_m = 6_371_008.8  # Bán kính Trái Đất trung bình (mét)
 
-    phi1 = math.radians(lat1)
-    phi2 = math.radians(lat2)
-    delta_phi = math.radians(lat2 - lat1)
-    delta_lambda = math.radians(lon2 - lon1)
+    lat1_f = float(lat1)
+    lon1_f = float(lon1)
+    lat2_f = float(lat2)
+    lon2_f = float(lon2)
+
+    phi1 = math.radians(lat1_f)
+    phi2 = math.radians(lat2_f)
+    delta_phi = math.radians(lat2_f - lat1_f)
+    delta_lambda = math.radians(lon2_f - lon1_f)
 
     a = (
         math.sin(delta_phi / 2.0) ** 2
@@ -233,9 +238,31 @@ async def find_nearest_branches(
 
     # Graph đã tải thành công.
     # Lỗi của từng branch chỉ ảnh hưởng đến branch đó.
+    undirected_graph = None
+
     for branch in active_branches:
         b_lat = float(_get_branch_attr(branch, "latitude"))
         b_lon = float(_get_branch_attr(branch, "longitude"))
+
+        # 1. Tính khoảng cách Haversine sơ bộ
+        h_dist = _haversine(
+            customer_lat,
+            customer_lon,
+            b_lat,
+            b_lon,
+        )
+
+        # 2. Nếu chi nhánh nằm ngoài bán kính tải đồ thị (OSM_GRAPH_RADIUS_METERS),
+        # sử dụng khoảng cách Haversine trực tiếp, tránh việc ép snap vào các node rìa biên
+        # (boundary nodes) của đồ thị vốn dễ bị cụt đường dẫn hoặc một chiều.
+        if h_dist > OSM_GRAPH_RADIUS_METERS:
+            results.append(
+                {
+                    "branch": branch,
+                    "distance_m": round(h_dist, 1),
+                }
+            )
+            continue
 
         try:
             branch_node = ox.distance.nearest_nodes(
@@ -244,14 +271,27 @@ async def find_nearest_branches(
                 Y=b_lat,
             )
 
-            # Chạy thuật toán Dijkstra theo yêu cầu Dev 2.
-            distance_m = nx.shortest_path_length(
-                graph,
-                source=customer_node,
-                target=branch_node,
-                weight="length",
-                method="dijkstra",
-            )
+            # Chạy thuật toán Dijkstra (ưu tiên đồ thị có hướng theo luật giao thông)
+            try:
+                distance_m = nx.shortest_path_length(
+                    graph,
+                    source=customer_node,
+                    target=branch_node,
+                    weight="length",
+                    method="dijkstra",
+                )
+            except (nx.NetworkXNoPath, nx.NodeNotFound):
+                # Dự phòng 1: Nếu đường 1 chiều bị cắt cụt do biên đồ thị hoặc không có đường có hướng,
+                # thử Dijkstra trên đồ thị vô hướng
+                if undirected_graph is None:
+                    undirected_graph = graph.to_undirected(as_view=True)
+                distance_m = nx.shortest_path_length(
+                    undirected_graph,
+                    source=customer_node,
+                    target=branch_node,
+                    weight="length",
+                    method="dijkstra",
+                )
 
             results.append(
                 {
@@ -261,20 +301,14 @@ async def find_nearest_branches(
             )
 
         except (nx.NetworkXNoPath, nx.NodeNotFound) as exc:
-            # Không có đường đi/node -> chỉ branch này fallback Haversine.
-            logger.warning(
-                "Không tìm được đường Dijkstra cho branch %s (%s). "
-                "Fallback Haversine.",
+            # Dự phòng 2: Nếu cả đồ thị vô hướng cũng không có đường đi (hòn đảo độc lập)
+            # -> Fallback sang Haversine một cách êm ái
+            logger.info(
+                "Chi nhánh %s không có đường Dijkstra nối tới (%s). Sử dụng khoảng cách Haversine.",
                 _get_branch_attr(branch, "id", "unknown"),
                 exc,
             )
 
-            h_dist = _haversine(
-                customer_lat,
-                customer_lon,
-                b_lat,
-                b_lon,
-            )
             results.append(
                 {
                     "branch": branch,
@@ -292,12 +326,6 @@ async def find_nearest_branches(
                 exc,
             )
 
-            h_dist = _haversine(
-                customer_lat,
-                customer_lon,
-                b_lat,
-                b_lon,
-            )
             results.append(
                 {
                     "branch": branch,
