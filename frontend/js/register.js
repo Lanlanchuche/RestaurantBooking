@@ -46,6 +46,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const roleBtnOwner = document.getElementById("role-btn-owner");
     const restaurantFields = document.getElementById("restaurant-fields");
     const restaurantNameInput = document.getElementById("restaurant-name");
+    const customerFields = document.getElementById("customer-fields");
 
     const passwordInput = document.getElementById("password");
     const confirmPasswordInput = document.getElementById("confirm-password");
@@ -82,16 +83,18 @@ document.addEventListener("DOMContentLoaded", () => {
             roleBtnCustomer.classList.remove("active");
             roleBtnCustomer.setAttribute("aria-selected", "false");
 
-            restaurantFields.hidden = false;
-            restaurantNameInput.setAttribute("required", "required");
+            if (restaurantFields) restaurantFields.hidden = false;
+            if (restaurantNameInput) restaurantNameInput.setAttribute("required", "required");
+            if (customerFields) customerFields.hidden = true;
         } else {
             roleBtnCustomer.classList.add("active");
             roleBtnCustomer.setAttribute("aria-selected", "true");
             roleBtnOwner.classList.remove("active");
             roleBtnOwner.setAttribute("aria-selected", "false");
 
-            restaurantFields.hidden = true;
-            restaurantNameInput.removeAttribute("required");
+            if (restaurantFields) restaurantFields.hidden = true;
+            if (restaurantNameInput) restaurantNameInput.removeAttribute("required");
+            if (customerFields) customerFields.hidden = false;
         }
     }
 
@@ -154,6 +157,9 @@ document.addEventListener("DOMContentLoaded", () => {
         let restaurantName = "";
         let restaurantEmail = "";
         let restaurantPhone = "";
+        
+        let customerPhone = "";
+        let customerAddress = "";
 
         if (role === "RESTAURANT_OWNER") {
             restaurantName = restaurantNameInput.value.trim();
@@ -171,6 +177,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 document.getElementById("restaurant-email").focus();
                 return;
             }
+        } else if (role === "CUSTOMER") {
+            const phoneEl = document.getElementById("phone");
+            const addressEl = document.getElementById("address");
+            if (phoneEl) customerPhone = phoneEl.value.trim();
+            if (addressEl) customerAddress = addressEl.value.trim();
         }
 
         // Tạo payload đăng ký
@@ -188,6 +199,13 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             if (restaurantPhone) {
                 payload.restaurant_phone = restaurantPhone;
+            }
+        } else if (role === "CUSTOMER") {
+            if (customerPhone) {
+                payload.customer_phone = customerPhone;
+            }
+            if (customerAddress) {
+                payload.customer_address = customerAddress;
             }
         }
 
