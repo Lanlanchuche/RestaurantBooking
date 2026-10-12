@@ -17,53 +17,7 @@
 const DEFAULT_MAP_CENTER = [10.7769, 106.7009]; // TP. Hồ Chí Minh
 const DEFAULT_MAP_ZOOM = 12;
 
-// Dữ liệu mẫu chuẩn đồng bộ với book.js
-const INITIAL_BRANCHES = [
-    {
-        id: 1,
-        name: "Chi nhánh Bến Nghé — Quận 1",
-        address: "72 Lê Thánh Tôn, P. Bến Nghé, Quận 1, TP. HCM",
-        phone: "028 3822 5566",
-        opening_hours: "10:00 - 22:30",
-        total_tables: 12,
-        available_tables: 5,
-        latitude: 10.7769,
-        longitude: 106.7009
-    },
-    {
-        id: 2,
-        name: "Chi nhánh Thảo Điền — TP. Thủ Đức",
-        address: "18 Xuân Thủy, P. Thảo Điền, TP. Thủ Đức, TP. HCM",
-        phone: "028 3744 1122",
-        opening_hours: "11:00 - 23:00",
-        total_tables: 10,
-        available_tables: 3,
-        latitude: 10.8035,
-        longitude: 106.7324
-    },
-    {
-        id: 3,
-        name: "Chi nhánh Landmark 81 — Bình Thạnh",
-        address: "Tầng 5, Vincom Landmark 81, 720A Điện Biên Phủ, Bình Thạnh, TP. HCM",
-        phone: "028 3911 8899",
-        opening_hours: "09:30 - 22:00",
-        total_tables: 8,
-        available_tables: 4,
-        latitude: 10.7951,
-        longitude: 106.7218
-    },
-    {
-        id: 4,
-        name: "Chi nhánh Phú Mỹ Hưng — Quận 7",
-        address: "102 Nguyễn Đức Cảnh, P. Tân Phong, Quận 7, TP. HCM",
-        phone: "028 5412 3344",
-        opening_hours: "10:30 - 22:30",
-        total_tables: 14,
-        available_tables: 2,
-        latitude: 10.7291,
-        longitude: 106.7099
-    }
-];
+
 
 let _branches = [];
 let _mainMap = null;
@@ -124,15 +78,14 @@ function getFallbackBranches() {
         const stored = localStorage.getItem("restaurant_branches");
         if (stored) {
             const parsed = JSON.parse(stored);
-            if (Array.isArray(parsed) && parsed.length > 0) {
+            if (Array.isArray(parsed)) {
                 return parsed;
             }
         }
     } catch {
         // Fallback
     }
-    localStorage.setItem("restaurant_branches", JSON.stringify(INITIAL_BRANCHES));
-    return INITIAL_BRANCHES;
+    return [];
 }
 
 function saveBranchesLocally(data) {
@@ -695,7 +648,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const ownerAvatar = document.getElementById("branches-owner-avatar");
 
     if (ownerName) ownerName.textContent = displayName(currentUser);
-    if (ownerRest) ownerRest.textContent = currentUser.restaurant_name || "Le Ciel Gourmet";
+    if (ownerRest) ownerRest.textContent = currentUser.restaurant_name || "";
     if (ownerAvatar) {
         ownerAvatar.textContent = (currentUser.name || "QL").substring(0, 2).toUpperCase();
     }

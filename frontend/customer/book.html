@@ -144,7 +144,7 @@
                                     Ngày dùng bữa
                                 </label>
                                 <div class="date-quick-chips">
-                                    <button type="button" class="quick-chip-btn active" data-offset="0">Hôm nay</button>
+                                    <button type="button" class="quick-chip-btn" data-offset="0">Hôm nay</button>
                                     <button type="button" class="quick-chip-btn" data-offset="1">Ngày mai</button>
                                     <button type="button" class="quick-chip-btn" data-offset="2">Ngày kia</button>
                                     <button type="button" class="quick-chip-btn" data-offset="5">Cuối tuần này</button>
@@ -177,7 +177,7 @@
                                     <button type="button" class="time-slot-btn" data-time="17:30">17:30</button>
                                     <button type="button" class="time-slot-btn" data-time="18:00">18:00</button>
                                     <button type="button" class="time-slot-btn" data-time="18:30">18:30</button>
-                                    <button type="button" class="time-slot-btn selected" data-time="19:00">19:00</button>
+                                    <button type="button" class="time-slot-btn" data-time="19:00">19:00</button>
                                     <button type="button" class="time-slot-btn" data-time="19:30">19:30</button>
                                     <button type="button" class="time-slot-btn" data-time="20:00">20:00</button>
                                     <button type="button" class="time-slot-btn" data-time="20:30">20:30</button>
@@ -203,7 +203,7 @@
 
                                 <div class="guest-quick-pills">
                                     <button type="button" class="guest-pill-btn" data-guests="1">1 người</button>
-                                    <button type="button" class="guest-pill-btn active" data-guests="2">2 người</button>
+                                    <button type="button" class="guest-pill-btn" data-guests="2">2 người</button>
                                     <button type="button" class="guest-pill-btn" data-guests="4">4 người</button>
                                     <button type="button" class="guest-pill-btn" data-guests="6">6 người</button>
                                     <button type="button" class="guest-pill-btn" data-guests="8">8 người</button>
@@ -252,20 +252,23 @@
 
                         <!-- Chi tiết thời gian và bàn -->
                         <div class="summary-details-list">
-                            <div class="summary-row">
-                                <span class="summary-row-label">Thời gian:</span>
-                                <span id="sum-datetime-val" class="summary-row-val">19:00 • Hôm nay</span>
+                            <div id="sum-datetime-row" class="summary-row" hidden>
+                                <span class="summary-row-label">
+                                    <span>🕒</span>
+                                    <span>Thời gian:</span>
+                                </span>
+                                <span id="sum-datetime-val" class="summary-row-val"></span>
                             </div>
 
-                            <div class="summary-row">
-                                <span class="summary-row-label">Số khách:</span>
-                                <span id="sum-guest-val" class="summary-row-val">2 Khách</span>
+                            <div id="sum-guest-row" class="summary-row" hidden>
+                                <span class="summary-row-label">
+                                    <span>👥</span>
+                                    <span>Số khách:</span>
+                                </span>
+                                <span id="sum-guest-val" class="summary-row-val"></span>
                             </div>
 
-                            <div class="summary-row">
-                                <span class="summary-row-label">Số bàn tạm tính:</span>
-                                <span class="summary-row-val" style="color:var(--wine);">Tự động gán</span>
-                            </div>
+
                         </div>
 
                         <button type="button" id="btn-submit-booking" class="btn-confirm-booking" style="margin-top: 20px;">

@@ -15,7 +15,7 @@ let currentBranches = [];
 const bookingState = {
     selectedBranch: null,
     date: "",
-    time: "19:00",
+    time: "",
     guestCount: 2,
     customerName: "",
     customerPhone: "",
@@ -92,6 +92,66 @@ function initUserHeader(user) {
 }
 
 /**
+ * Load danh sách chi nhánh từ API hoặc localStorage
+ */
+async function loadBranchesData() {
+    try {
+        // Thử load từ backend API
+        const data = await api.get("/restaurant/me/branches");
+        if (Array.isArray(data) && data.length > 0) {
+            loadedBranches = data.map((b) => ({
+                id: b.id,
+                restaurantName: b.restaurant_name || b.name,
+                name: b.name,
+                address: b.address,
+                cuisine: b.cuisine || "",
+                rating: b.rating || null,
+                reviewsCount: b.reviews_count || 0,
+                distanceKm: b.distance_km || 0,
+                durationMin: b.duration_min || 0,
+                totalTables: b.total_tables || 0,
+                availableTables: b.available_tables || 0,
+                lat: b.latitude,
+                lng: b.longitude,
+                image: b.image || ""
+            }));
+            return;
+        }
+    } catch {
+        // Backend offline, fallback localStorage
+    }
+    // Fallback: tải từ localStorage (do branches.js lưu)
+    try {
+        const stored = localStorage.getItem("restaurant_branches");
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                loadedBranches = parsed.map((b) => ({
+                    id: b.id,
+                    restaurantName: b.restaurant_name || b.name,
+                    name: b.name,
+                    address: b.address,
+                    cuisine: b.cuisine || "",
+                    rating: b.rating || null,
+                    reviewsCount: b.reviews_count || 0,
+                    distanceKm: b.distance_km || 0,
+                    durationMin: b.duration_min || 0,
+                    totalTables: b.total_tables || 0,
+                    availableTables: b.available_tables || 0,
+                    lat: b.latitude,
+                    lng: b.longitude,
+                    image: b.image || ""
+                }));
+                return;
+            }
+        }
+    } catch {
+        // Ignore
+    }
+    loadedBranches = [];
+}
+
+/**
  * Lấy danh sách Top 5 nhà hàng gần nhất sắp xếp theo khoảng cách
  */
 function getTop5Branches() {
@@ -111,7 +171,9 @@ function initBookingMap() {
     }
 
     const top5 = getTop5Branches();
-    const defaultCenter = [top5[0].lat, top5[0].lng];
+    const defaultCenter = top5.length > 0
+        ? [top5[0].lat, top5[0].lng]
+        : [10.7769, 106.7009]; // TP. Hồ Chí Minh fallback
 
     // Tạo bản đồ Leaflet
     bookingMap = L.map("booking-map", {
@@ -435,37 +497,56 @@ function initDateTimeSection() {
     const dateInput = document.getElementById("book-date-input");
     const todayStr = getDateStringOffset(0);
 
-    bookingState.date = todayStr;
+    // Không gán mặc định — để trống cho đến khi khách chọn
     if (dateInput) {
         dateInput.min = todayStr;
-        dateInput.value = todayStr;
+        dateInput.value = "";
         dateInput.addEventListener("change", (e) => {
             bookingState.date = e.target.value;
+            bookingState._dateTouched = !!e.target.value;
             document.querySelectorAll(".quick-chip-btn").forEach((b) => b.classList.remove("active"));
             updateSummary();
         });
     }
 
-    // Quick chip buttons (Hôm nay, Ngày mai, ...)
+    // Quick chip buttons (Hôm nay, Ngày mai, ...) — hỗ trợ toggle bỏ chọn khi nhấn lần 2
     document.querySelectorAll(".quick-chip-btn").forEach((btn) => {
         btn.addEventListener("click", () => {
+            const wasActive = btn.classList.contains("active");
             document.querySelectorAll(".quick-chip-btn").forEach((b) => b.classList.remove("active"));
-            btn.classList.add("active");
 
-            const offset = parseInt(btn.dataset.offset || "0", 10);
-            const targetDate = getDateStringOffset(offset);
-            bookingState.date = targetDate;
-            if (dateInput) dateInput.value = targetDate;
+            if (wasActive) {
+                // Nhấn lần 2 — bỏ chọn
+                bookingState.date = "";
+                bookingState._dateTouched = false;
+                if (dateInput) dateInput.value = "";
+            } else {
+                btn.classList.add("active");
+                const offset = parseInt(btn.dataset.offset || "0", 10);
+                const targetDate = getDateStringOffset(offset);
+                bookingState.date = targetDate;
+                bookingState._dateTouched = true;
+                if (dateInput) dateInput.value = targetDate;
+            }
             updateSummary();
         });
     });
 
-    // Time slot buttons
+    // Time slot buttons — hỗ trợ toggle bỏ chọn khi nhấn lần 2
     document.querySelectorAll(".time-slot-btn").forEach((btn) => {
         btn.addEventListener("click", () => {
+            const wasSelected = btn.classList.contains("selected");
             document.querySelectorAll(".time-slot-btn").forEach((b) => b.classList.remove("selected"));
-            btn.classList.add("selected");
-            bookingState.time = btn.dataset.time || btn.textContent.trim();
+
+            if (wasSelected) {
+                // Nhấn lần 2 — bỏ chọn giờ
+                bookingState.time = "";
+                bookingState._timeTouched = false;
+            } else {
+                btn.classList.add("selected");
+                bookingState.time = btn.dataset.time || btn.textContent.trim();
+                bookingState._timeTouched = true;
+            }
             updateSummary();
         });
     });
@@ -495,7 +576,7 @@ function initGuestPicker() {
 
         document.querySelectorAll(".guest-pill-btn").forEach((pill) => {
             const val = parseInt(pill.dataset.guests || "0", 10);
-            pill.classList.toggle("active", val === bookingState.guestCount);
+            pill.classList.toggle("active", bookingState._guestTouched && val === bookingState.guestCount);
         });
 
         updateSummary();
@@ -505,6 +586,7 @@ function initGuestPicker() {
         btnMinus.addEventListener("click", () => {
             if (bookingState.guestCount > 1) {
                 bookingState.guestCount--;
+                bookingState._guestTouched = true;
                 updateGuestUI();
             }
         });
@@ -514,14 +596,25 @@ function initGuestPicker() {
         btnPlus.addEventListener("click", () => {
             if (bookingState.guestCount < 20) {
                 bookingState.guestCount++;
+                bookingState._guestTouched = true;
                 updateGuestUI();
             }
         });
     }
 
+    // Guest pill buttons — hỗ trợ toggle bỏ chọn khi nhấn lần 2
     document.querySelectorAll(".guest-pill-btn").forEach((pill) => {
         pill.addEventListener("click", () => {
-            bookingState.guestCount = parseInt(pill.dataset.guests || "2", 10);
+            const pillVal = parseInt(pill.dataset.guests || "2", 10);
+            const wasActive = bookingState._guestTouched && bookingState.guestCount === pillVal;
+
+            if (wasActive) {
+                // Nhấn lần 2 — bỏ chọn, ẩn dòng số khách trong tóm tắt
+                bookingState._guestTouched = false;
+            } else {
+                bookingState.guestCount = pillVal;
+                bookingState._guestTouched = true;
+            }
             updateGuestUI();
         });
     });
@@ -531,7 +624,8 @@ function initGuestPicker() {
 
 /**
  * Cập nhật cột tóm tắt thông tin đặt bàn trực quan (Sticky Sidebar)
- * Đã lược bỏ: vị trí bàn mong muốn, món ăn đặt trước và chi phí đặt chỗ
+ * Đã lược bỏ: vị trí bàn mong muốn, món ăn đặt trước, chi phí đặt chỗ và số bàn tạm tính
+ * Các dòng thời gian, số khách ẩn mặc định — chỉ hiện khi khách hàng chọn giá trị
  */
 function updateSummary() {
     // 1. Chi nhánh
@@ -547,16 +641,29 @@ function updateSummary() {
         if (branchAddrEl) branchAddrEl.textContent = "Vui lòng chọn 1 nhà hàng bên cạnh";
     }
 
-    // 2. Thời gian
+    // 2. Thời gian — chỉ hiện khi khách đã chọn CẢ ngày VÀ giờ, nếu thiếu thì để trống
+    const timeRow = document.getElementById("sum-datetime-row");
     const timeEl = document.getElementById("sum-datetime-val");
-    if (timeEl) {
-        timeEl.textContent = `${bookingState.time} • ${formatDateVi(bookingState.date)}`;
+    if (timeRow && timeEl) {
+        if (bookingState._dateTouched && bookingState.date && bookingState._timeTouched && bookingState.time) {
+            timeEl.textContent = `${bookingState.time} • ${formatDateVi(bookingState.date)}`;
+            timeRow.hidden = false;
+        } else {
+            timeEl.textContent = "";
+            timeRow.hidden = true;
+        }
     }
 
-    // 3. Số khách
+    // 3. Số khách — chỉ hiện khi khách đã tương tác chọn số lượng
+    const guestRow = document.getElementById("sum-guest-row");
     const guestEl = document.getElementById("sum-guest-val");
-    if (guestEl) {
-        guestEl.textContent = `${bookingState.guestCount} Khách`;
+    if (guestRow && guestEl) {
+        if (bookingState._guestTouched) {
+            guestEl.textContent = `${bookingState.guestCount} Khách`;
+            guestRow.hidden = false;
+        } else {
+            guestRow.hidden = true;
+        }
     }
 }
 
@@ -696,7 +803,7 @@ async function handleBookingSubmit() {
 }
 
 // Khởi chạy khi tài liệu sẵn sàng
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
     // 1. Kiểm tra xác thực (tự động tạo phiên demo nếu cần)
     const user = requireAuth("CUSTOMER");
     if (!user) return;
@@ -704,7 +811,10 @@ document.addEventListener("DOMContentLoaded", () => {
     // 2. Khởi tạo header
     initUserHeader(user);
 
-    // 3. Khởi tạo Top 5 chi nhánh và mặc định chọn chi nhánh đầu tiên
+    // 3. Load danh sách chi nhánh từ API / localStorage
+    await loadBranchesData();
+
+    // 4. Khởi tạo Top 5 chi nhánh và mặc định chọn chi nhánh đầu tiên
     const top5 = getTop5Branches();
     if (top5.length > 0) {
         bookingState.selectedBranch = top5[0];
@@ -715,10 +825,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     renderTop5Branches(top5);
 
-    // 4. Khởi tạo Leaflet Map
+    // 5. Khởi tạo Leaflet Map
     initBookingMap();
 
-    // 5. Khởi tạo chọn ngày giờ và số khách
+    // 6. Khởi tạo chọn ngày giờ và số khách
     initDateTimeSection();
     initGuestPicker();
     updateSummary();
@@ -896,13 +1006,13 @@ document.addEventListener("DOMContentLoaded", () => {
         submitBtn.addEventListener("click", handleBookingSubmit);
     }
 
-    // 8. Nút Đăng xuất
+    // 9. Nút Đăng xuất
     const logoutBtn = document.getElementById("btn-logout");
     if (logoutBtn) {
         logoutBtn.addEventListener("click", logout);
     }
 
-    // 9. Đóng modal xác nhận
+    // 10. Đóng modal xác nhận
     const closeModalBtn = document.getElementById("btn-close-ticket");
     if (closeModalBtn) {
         closeModalBtn.addEventListener("click", () => {

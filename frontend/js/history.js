@@ -5,50 +5,7 @@
 
 const CANCELLATION_WINDOW_HOURS = 24;
 
-// Dữ liệu mẫu nếu chưa có đặt bàn nào
-const DEFAULT_SAMPLE_RESERVATIONS = [
-    {
-        id: "TR-892415",
-        branch_id: 1,
-        branch_name: "Chi nhánh Bến Nghé — Quận 1",
-        restaurant_name: "Le Ciel Gourmet",
-        branch_address: "72 Lê Thánh Tôn, P. Bến Nghé, Quận 1, TP. HCM",
-        reservation_time: "19:00 • Thứ Bảy, 17/10/2026",
-        raw_time: "2026-10-17T19:00:00",
-        guest_count: 2,
-        seating_area: "Gần cửa sổ",
-        table_number: 4,
-        customer_name: "Nguyễn Minh Khang",
-        customer_phone: "0909 123 456",
-        status: "CONFIRMED",
-        pre_ordered_dishes: [
-            { name: "Bò Wagyu A5 sốt tiêu đen thượng hạng", quantity: 1, price: 590000 },
-            { name: "Set tráng miệng Tinh hoa bánh ngọt Pháp", quantity: 1, price: 180000 }
-        ],
-        special_requests: "🎂 Trang trí sinh nhật. Chuẩn bị nến & hoa tươi",
-        created_at: new Date(Date.now() - 3600000 * 4).toISOString()
-    },
-    {
-        id: "TR-674120",
-        branch_id: 2,
-        branch_name: "Chi nhánh Thảo Điền — TP. Thủ Đức",
-        restaurant_name: "Nhà Hàng Hương Sen",
-        branch_address: "18 Xuân Thủy, Thảo Điền, TP. Thủ Đức, TP. HCM",
-        reservation_time: "12:30 • Chủ Nhật, 18/10/2026",
-        raw_time: "2026-10-18T12:30:00",
-        guest_count: 4,
-        seating_area: "Sân vườn ngoài trời",
-        table_number: 8,
-        customer_name: "Nguyễn Minh Khang",
-        customer_phone: "0909 123 456",
-        status: "PENDING",
-        pre_ordered_dishes: [
-            { name: "Tôm hùm Alaska bỏ lò phô mai Gruyère", quantity: 1, price: 720000 }
-        ],
-        special_requests: "👶 Chuẩn bị 01 ghế trẻ em",
-        created_at: new Date(Date.now() - 3600000 * 20).toISOString()
-    }
-];
+
 
 let reservations = [];
 let currentFilter = "ALL";
