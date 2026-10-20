@@ -54,30 +54,20 @@ function requireAuth(requiredRole = "CUSTOMER") {
     let user = getUser();
 
     if (!token) {
-        // Tự động cấp phiên demo để người dùng trải nghiệm ngay lập tức nếu chưa qua trang đăng nhập
-        const demoUser = {
-            id: 1,
-            name: "Nguyễn Minh Khang",
-            email: "minhkhang@tablereserve.vn",
-            phone: "0909 123 456",
-            address: "68 Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh",
-            role: requiredRole,
-        };
-        setAuthData("demo-session-token", demoUser);
-        return demoUser;
+        // Chưa đăng nhập -> chuyển đến trang đăng nhập
+        location.href = authPageHref("login.html");
+        return null;
     }
 
     if (!user) {
-        user = {
-            id: 1,
-            name: "Khách hàng",
-            email: "customer@tablereserve.vn",
-            role: requiredRole,
-        };
-        localStorage.setItem(USER_KEY, JSON.stringify(user));
+        // Token tồn tại nhưng chưa có user data -> fetch và redirect
+        location.href = authPageHref("login.html");
+        return null;
     }
 
-    if (requiredRole && user.role && user.role !== requiredRole) {
+    const userRole = String(user.role || "").toUpperCase();
+    const reqRole = String(requiredRole || "").toUpperCase();
+    if (reqRole && userRole !== reqRole) {
         location.href = dashboardHref(user.role);
         return null;
     }

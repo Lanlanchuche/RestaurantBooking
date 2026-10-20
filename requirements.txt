@@ -1,5 +1,0 @@
-email-validator==2.3.0
-sqlalchemy==2.1.4
-passlib==1.7.4
-python-jose[cryptography]==3.5.0
-bcrypt==5.0.0
