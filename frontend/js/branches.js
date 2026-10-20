@@ -73,43 +73,22 @@ function createCustomMarkerIcon(numberStr = "📍") {
 // DATA MANAGEMENT (API & LOCALSTORAGE)
 // ==========================================================================
 
-function getFallbackBranches() {
-    try {
-        const stored = localStorage.getItem("restaurant_branches");
-        if (stored) {
-            const parsed = JSON.parse(stored);
-            if (Array.isArray(parsed)) {
-                return parsed;
-            }
-        }
-    } catch {
-        // Fallback
-    }
-    return [];
-}
+// Xóa data giả từ localStorage nếu còn tồn tại
+try { localStorage.removeItem("restaurant_branches"); } catch { }
 
-function saveBranchesLocally(data) {
-    try {
-        localStorage.setItem("restaurant_branches", JSON.stringify(data));
-    } catch {
-        // Ignore local storage error
-    }
-}
 
 /**
- * Tải danh sách chi nhánh từ Backend REST API (với fallback offline)
+ * Tải danh sách chi nhánh từ Backend REST API thật.
+ * Nếu chưa có chi nhánh nào → hiển empty state, không dùng data giả.
  */
 async function loadBranches() {
     setLoading(true, "Đang tải danh sách chi nhánh...");
     try {
         const data = await api.get("/restaurant/me/branches");
-        if (Array.isArray(data) && data.length > 0) {
-            _branches = data;
-        } else {
-            _branches = getFallbackBranches();
-        }
-    } catch {
-        _branches = getFallbackBranches();
+        _branches = Array.isArray(data) ? data : [];
+    } catch (err) {
+        showToast("Không thể tải danh sách chi nhánh: " + (err.message || ""), "danger");
+        _branches = [];
     } finally {
         setLoading(false);
         renderBranchList();
@@ -563,7 +542,6 @@ async function handleSaveBranch(e) {
         phone,
         total_tables: totalTables,
         available_tables: availTables,
-        opening_hours: hours,
         latitude: lat,
         longitude: lng
     };
@@ -572,41 +550,31 @@ async function handleSaveBranch(e) {
     try {
         if (idVal) {
             // Sửa chi nhánh
-            await api.patch(`/restaurant/me/branches/${idVal}`, payload);
+            const updated = await api.patch(`/restaurant/me/branches/${idVal}`, payload);
             const idx = _branches.findIndex((b) => String(b.id) === String(idVal));
             if (idx >= 0) {
-                _branches[idx] = { ..._branches[idx], ...payload, id: Number(idVal) };
+                _branches[idx] = updated || { ..._branches[idx], ...payload, id: Number(idVal) };
             }
             showToast("Đã cập nhật chi nhánh thành công!", "info");
         } else {
             // Thêm chi nhánh mới
-            let newBranch = null;
-            try {
-                newBranch = await api.post("/restaurant/me/branches", payload);
-            } catch {
-                // Offline fallback
-                newBranch = { ...payload, id: Date.now() };
-            }
-            _branches.push(newBranch || { ...payload, id: Date.now() });
+            const newBranch = await api.post("/restaurant/me/branches", payload);
+            _branches.push(newBranch);
             showToast("Đã thêm chi nhánh mới vào hệ thống!", "info");
         }
-    } catch {
-        // Fallback offline
-        if (idVal) {
-            const idx = _branches.findIndex((b) => String(b.id) === String(idVal));
-            if (idx >= 0) _branches[idx] = { ..._branches[idx], ...payload, id: Number(idVal) };
-        } else {
-            _branches.push({ ...payload, id: Date.now() });
+    } catch (err) {
+        if (alertBox) {
+            alertBox.hidden = false;
+            alertBox.textContent = "Lỗi: " + (err.message || "Không thể lưu chi nhánh.");
         }
-        showToast("Đã lưu chi nhánh thành công (chế độ demo)!", "info");
+        return;
     } finally {
-        saveBranchesLocally(_branches);
         setLoading(false);
-        closeAllModals();
-        renderBranchList();
-        updateBranchStats();
-        updateMainMapMarkers();
     }
+    closeAllModals();
+    renderBranchList();
+    updateBranchStats();
+    updateMainMapMarkers();
 }
 
 /**
@@ -619,17 +587,16 @@ async function handleDeleteBranch() {
     setLoading(true, "Đang xóa chi nhánh...");
     try {
         await api.delete(`/restaurant/me/branches/${branchId}`);
-    } catch {
-        // Fallback offline
-    } finally {
         _branches = _branches.filter((b) => b.id !== branchId);
-        saveBranchesLocally(_branches);
-        setLoading(false);
         closeAllModals();
         renderBranchList();
         updateBranchStats();
         updateMainMapMarkers();
         showToast("Đã xóa chi nhánh khỏi hệ thống.", "info");
+    } catch (err) {
+        showToast("Xóa thất bại: " + (err.message || ""), "danger");
+    } finally {
+        setLoading(false);
     }
 }
 

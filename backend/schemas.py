@@ -147,6 +147,7 @@ class BranchUpdate(BaseModel):
     longitude: Optional[float] = None
     phone: Optional[str] = None
     total_tables: Optional[int] = Field(None, gt=0)
+    available_tables: Optional[int] = Field(None, ge=0)
     is_active: Optional[bool] = None
 
 

@@ -22,7 +22,7 @@ const PING_INTERVAL_MS = 25000;
 let _ws = null;
 let _reconnectTimer = null;
 let _pingTimer = null;
-let _restaurantId = 1;
+let _restaurantId = null; // Sẽ được set sau khi fetch từ API
 let _reservations = [];
 let _activeFilterStatus = "ALL";
 let _activeFilterBranch = "ALL";
@@ -277,11 +277,13 @@ function buildReservationRow(r) {
             `</div>`;
     }
 
+    // Hỗ trợ cả 2 field names từ backend (special_requests và special_request)
+    const specialReqs = r.special_requests || r.special_request || "";
     let reqHtml = "";
-    if (r.special_requests) {
-        reqHtml = `<div class="special-req-tag" title="${escHtml(r.special_requests)}">
+    if (specialReqs) {
+        reqHtml = `<div class="special-req-tag" title="${escHtml(specialReqs)}">
             <span>📝</span>
-            <span style="max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(r.special_requests)}</span>
+            <span style="max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(specialReqs)}</span>
         </div>`;
     }
 
@@ -309,7 +311,7 @@ function buildReservationRow(r) {
         <tr id="res-row-${escHtml(r.id)}" data-id="${escHtml(r.id)}" data-status="${escHtml(r.status)}" data-branch="${escHtml(r.branch_id || '')}">
             <td>
                 <div class="res-code-cell">
-                    <span>${escHtml(r.id)}</span>
+                    <span>#${escHtml(r.id)}</span>
                     <span class="res-created-ago">${escHtml(timeAgoStr)}</span>
                 </div>
             </td>
@@ -320,11 +322,11 @@ function buildReservationRow(r) {
                 </div>
             </td>
             <td>
-                <div class="res-branch-badge">${escHtml(r.branch_name || "Chi nhánh chính")}</div>
+                <div class="res-branch-badge">${escHtml(r.branch_name || (r.branch && r.branch.name) || "Chi nhánh chính")}</div>
                 <div class="res-table-badge">Bàn số ${escHtml(r.table_number || "Tự động")}</div>
             </td>
             <td>
-                <div class="res-time-main">${escHtml(r.reservation_time || "Chưa xếp giờ")}</div>
+                <div class="res-time-main">${escHtml(r.reservation_time ? new Date(r.reservation_time).toLocaleString("vi-VN") : "Chưa xếp giờ")}</div>
             </td>
             <td>
                 <span class="res-guests-badge">👥 ${escHtml(r.guest_count || 1)} khách</span>
@@ -351,12 +353,11 @@ function buildReservationRow(r) {
 async function loadReservations() {
     setLoading(true, "Đang tải danh sách đặt bàn...");
     try {
-        // Thử lấy từ Backend REST API thật theo spec
         const data = await api.get("/restaurant/me/reservations");
         _reservations = Array.isArray(data) ? data : [];
-    } catch {
-        // Khi backend chưa chạy, fallback về dữ liệu đã lưu trong localStorage
-        _reservations = getFallbackReservations();
+    } catch (err) {
+        showToast("Không thể tải dữ liệu đặt bàn: " + (err.message || ""), "danger");
+        _reservations = [];
     } finally {
         setLoading(false);
         populateBranchFilter();
@@ -489,7 +490,7 @@ function renderFilteredRows() {
     if (_searchQuery) {
         const q = _searchQuery.toLowerCase();
         filtered = filtered.filter((r) => {
-            const id = (r.id || "").toLowerCase();
+            const id = String(r.id || "").toLowerCase();
             const name = (r.customer_name || "").toLowerCase();
             const phone = (r.customer_phone || "").toLowerCase();
             return id.includes(q) || name.includes(q) || phone.includes(q);
@@ -515,8 +516,8 @@ function renderFilteredRows() {
 function handleNewIncomingReservation(newRes) {
     if (!newRes || !newRes.id) return;
 
-    // Tránh trùng lặp
-    const existingIndex = _reservations.findIndex((r) => r.id === newRes.id);
+    // Tránh trùng lặp - so sánh cả string và number
+    const existingIndex = _reservations.findIndex((r) => String(r.id) === String(newRes.id));
     if (existingIndex >= 0) {
         _reservations[existingIndex] = { ..._reservations[existingIndex], ...newRes };
     } else {
@@ -533,12 +534,12 @@ function handleNewIncomingReservation(newRes) {
     const banner = document.getElementById("live-order-banner");
     const details = document.getElementById("live-order-details");
     if (banner && details) {
-        details.textContent = `${newRes.customer_name || "Khách hàng"} vừa đặt bàn tại ${newRes.branch_name || "chi nhánh"} (${newRes.guest_count || 2} khách).`;
+        details.textContent = `${newRes.customer_name || "Khách hàng"} vừa đặt bàn tại ${newRes.branch_name || (newRes.branch && newRes.branch.name) || "chi nhánh"} (${newRes.guest_count || 2} khách).`;
         banner.hidden = false;
     }
 
     // Toast
-    showToast(`🛎 Có đơn đặt bàn mới: ${newRes.id} (${newRes.customer_name || 'Khách'})`, "info", 4500);
+    showToast(`🛎 Có đơn đặt bàn mới: #${newRes.id} (${newRes.customer_name || 'Khách'})`, "info", 4500);
 
     // Highlight hàng mới trong bảng
     const row = document.getElementById(`res-row-${newRes.id}`);
@@ -554,9 +555,11 @@ function handleNewIncomingReservation(newRes) {
 function openConfirmModal(res) {
     _selectedReservation = res;
     const modal = document.getElementById("modal-confirm");
-    document.getElementById("confirm-modal-code").textContent = res.id;
+    document.getElementById("confirm-modal-code").textContent = "#" + res.id;
     document.getElementById("confirm-modal-cust").textContent = res.customer_name || "Khách hàng";
-    document.getElementById("confirm-modal-time").textContent = res.reservation_time || "Chưa xếp giờ";
+    document.getElementById("confirm-modal-time").textContent = res.reservation_time
+        ? new Date(res.reservation_time).toLocaleString("vi-VN")
+        : "Chưa xếp giờ";
     document.getElementById("confirm-modal-guests").textContent = `${res.guest_count || 2} khách`;
     document.getElementById("confirm-assign-table").value = res.table_number || "";
 
@@ -566,7 +569,7 @@ function openConfirmModal(res) {
 function openRejectModal(res) {
     _selectedReservation = res;
     const modal = document.getElementById("modal-reject");
-    document.getElementById("reject-modal-code").textContent = res.id;
+    document.getElementById("reject-modal-code").textContent = "#" + res.id;
     document.getElementById("reject-modal-cust").textContent = res.customer_name || "Khách hàng";
     const reasonInput = document.getElementById("reject-reason-input");
     const errorMsg = document.getElementById("reject-error-msg");
@@ -582,13 +585,15 @@ function openRejectModal(res) {
 
 function openDetailModal(res) {
     const modal = document.getElementById("modal-detail");
-    document.getElementById("detail-code").textContent = res.id;
+    document.getElementById("detail-code").textContent = "#" + res.id;
     document.getElementById("detail-status-pill").innerHTML = fmtStatusBadge(res.status);
     document.getElementById("detail-cust-name").textContent = res.customer_name || "Khách hàng";
     document.getElementById("detail-cust-contact").textContent = `${res.customer_phone || "Không có SĐT"} • ${res.customer_email || "Không có email"}`;
-    document.getElementById("detail-branch-name").textContent = res.branch_name || "Chi nhánh chính";
+    document.getElementById("detail-branch-name").textContent = res.branch_name || (res.branch && res.branch.name) || "Chi nhánh chính";
     document.getElementById("detail-table-no").textContent = `Bàn số ${res.table_number || "Tự động"}`;
-    document.getElementById("detail-res-time").textContent = res.reservation_time || "Chưa xếp giờ";
+    document.getElementById("detail-res-time").textContent = res.reservation_time
+        ? new Date(res.reservation_time).toLocaleString("vi-VN")
+        : "Chưa xếp giờ";
     document.getElementById("detail-guest-count").textContent = `${res.guest_count || 1} khách`;
 
     // Món ăn đặt trước
@@ -607,7 +612,7 @@ function openDetailModal(res) {
 
     // Yêu cầu đặc biệt
     const reqBox = document.getElementById("detail-requests-box");
-    reqBox.textContent = res.special_requests || "Không có yêu cầu đặc biệt nào.";
+    reqBox.textContent = res.special_requests || res.special_request || "Không có yêu cầu đặc biệt nào.";
 
     // Lý do từ chối nếu có
     const rejRow = document.getElementById("detail-rejection-row");
@@ -640,23 +645,22 @@ async function submitConfirmReservation() {
     setLoading(true, "Đang xác nhận đặt bàn...");
     try {
         // Gọi PATCH API backend theo spec 3.3
-        await api.patch(`/restaurant/me/reservations/${resId}/confirm`, {
+        const result = await api.patch(`/restaurant/me/reservations/${resId}/confirm`, {
             table_number: assignTable ? parseInt(assignTable, 10) : undefined
         });
-    } catch {
-        // Fallback khi offline
-    } finally {
-        // Cập nhật trạng thái cục bộ
-        const target = _reservations.find((r) => r.id === resId);
-        if (target) {
-            target.status = "CONFIRMED";
-            if (assignTable) target.table_number = parseInt(assignTable, 10);
-            saveReservationsLocally(_reservations);
+        // Cập nhật từ kết quả thật từ server
+        const idx = _reservations.findIndex((r) => String(r.id) === String(resId));
+        if (idx >= 0 && result) {
+            _reservations[idx] = { ..._reservations[idx], ...result, status: "CONFIRMED" };
+            if (assignTable) _reservations[idx].table_number = parseInt(assignTable, 10);
         }
+        showToast(`Đã xác nhận đơn #${resId} thành công!`, "info");
+    } catch (err) {
+        showToast("Đặt bàn xác nhận thất bại: " + (err.message || ""), "danger");
+    } finally {
         setLoading(false);
         closeAllModals();
         renderTableAndStats();
-        showToast(`Đã xác nhận đơn ${resId} thành công!`, "info");
     }
 }
 
@@ -684,23 +688,23 @@ async function submitRejectReservation() {
 
     setLoading(true, "Đang gửi phản hồi từ chối...");
     try {
-        // Gọi PATCH API backend theo spec 3.3
-        await api.patch(`/restaurant/me/reservations/${resId}/reject`, {
+        // Gọi PATCH API backend với đúng field name theo schema
+        const result = await api.patch(`/restaurant/me/reservations/${resId}/reject`, {
             rejection_reason: reason
         });
-    } catch {
-        // Fallback khi offline
-    } finally {
-        const target = _reservations.find((r) => r.id === resId);
-        if (target) {
-            target.status = "REJECTED";
-            target.rejection_reason = reason;
-            saveReservationsLocally(_reservations);
+        // Cập nhật từ kết quả server
+        const idx = _reservations.findIndex((r) => String(r.id) === String(resId));
+        if (idx >= 0) {
+            _reservations[idx] = { ..._reservations[idx], status: "REJECTED", rejection_reason: reason };
+            if (result) _reservations[idx] = { ..._reservations[idx], ...result };
         }
+        showToast(`Đã từ chối đơn #${resId}. Bàn đã được hoàn trả.`, "info");
+    } catch (err) {
+        showToast("Từ chối đơn thất bại: " + (err.message || ""), "danger");
+    } finally {
         setLoading(false);
         closeAllModals();
         renderTableAndStats();
-        showToast(`Đã từ chối đơn ${resId}. Bàn đã được hoàn trả.`, "info");
     }
 }
 
@@ -719,19 +723,30 @@ document.addEventListener("DOMContentLoaded", () => {
     const ownerAvatarEl = document.getElementById("owner-avatar");
 
     if (ownerNameEl) ownerNameEl.textContent = displayName(currentUser);
-    if (ownerRestEl) ownerRestEl.textContent = currentUser.restaurant_name || "";
     if (ownerAvatarEl) {
-        const nameInitial = (currentUser.name || "QL").substring(0, 2).toUpperCase();
+        const nameInitial = (currentUser.name || displayName(currentUser) || "QL").substring(0, 2).toUpperCase();
         ownerAvatarEl.textContent = nameInitial;
     }
 
-    // 2. Tải dữ liệu ban đầu
+    // 2. Tải thông tin nhà hàng và restaurant_id cho WebSocket
+    let restaurantId = null;
+    try {
+        const info = await api.get("/restaurant/me/info");
+        restaurantId = info.id;
+        _restaurantId = restaurantId;
+        if (ownerRestEl) ownerRestEl.textContent = info.name || "";
+    } catch {
+        // Nếu chưa có hồ sơ nhà hàng, vẫn tiếp tục với id mặc định
+        if (ownerRestEl) ownerRestEl.textContent = currentUser.restaurant_name || "";
+    }
+
+    // 3. Tải dữ liệu ban đầu
     loadReservations();
 
-    // 3. Khởi tạo kết nối WebSocket với auto-reconnect
+    // 4. Khởi tạo kết nối WebSocket với auto-reconnect
     connectDashboardWS(_restaurantId, handleNewIncomingReservation);
 
-    // 4. Sự kiện Đăng xuất
+    // 5. Sự kiện Đăng xuất
     const logoutBtn = document.getElementById("btn-logout");
     if (logoutBtn) {
         logoutBtn.addEventListener("click", () => {
@@ -829,7 +844,8 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!btn) return;
             const action = btn.dataset.action;
             const id = btn.dataset.id;
-            const res = _reservations.find((r) => r.id === id);
+            // So sánh cả string lẫn number
+            const res = _reservations.find((r) => String(r.id) === String(id));
             if (!res) return;
 
             if (action === "confirm") {

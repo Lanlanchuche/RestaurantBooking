@@ -5,23 +5,14 @@ Các API RESTful dành cho RESTAURANT_OWNER quản lý hồ sơ nhà hàng, chi 
 và xử lý các yêu cầu đặt bàn (xác nhận/từ chối).
 """
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
 from backend.dependencies import get_current_user
 from backend import models, schemas
-
-# Mock imports for reservation_service logic until Dev 2 finishes
-# Dev 3 assumes these exist per the interface contract in docs
-async def confirm_reservation(db, reservation_id, owner):
-    # Dummy mock
-    pass
-
-async def reject_reservation(db, reservation_id, reason, owner):
-    # Dummy mock
-    pass
+from backend.services import reservation_service
 
 router = APIRouter(prefix="/api/restaurant", tags=["Restaurant"])
 
@@ -189,12 +180,18 @@ async def edit_branch(
         raise HTTPException(status_code=404, detail="Chi nhánh không tồn tại hoặc không thuộc quyền sở hữu")
         
     update_data = data.model_dump(exclude_unset=True)
-    if 'total_tables' in update_data:
+    # Nếu frontend gửi available_tables tường minh, dùng trực tiếp
+    # Nếu chỉ thay đổi total_tables, tự động điều chỉnh available_tables theo diff
+    if 'total_tables' in update_data and 'available_tables' not in update_data:
         diff = update_data['total_tables'] - branch.total_tables
         branch.available_tables = max(0, min(update_data['total_tables'], branch.available_tables + diff))
         
     for key, value in update_data.items():
         setattr(branch, key, value)
+    
+    # Đảm bảo available_tables không vượt quá total_tables sau khi set
+    if branch.available_tables > branch.total_tables:
+        branch.available_tables = branch.total_tables
         
     db.commit()
     db.refresh(branch)
@@ -227,7 +224,89 @@ async def delete_branch(
     db.commit()
     return {"detail": "Xóa chi nhánh thành công"}
 
-@router.get("/me/reservations", response_model=List[schemas.ReservationResponse])
+@router.get("/me/info")
+async def get_restaurant_info(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    Lấy thông tin cơ bản nhà hàng (bao gồm restaurant_id) cho frontend.
+    Được dùng để khởi tạo WebSocket với đúng restaurant_id.
+    """
+    restaurant = db.query(models.Restaurant).filter(
+        models.Restaurant.owner_id == current_user.id
+    ).first()
+    if not restaurant:
+        raise HTTPException(status_code=404, detail="Chưa có hồ sơ nhà hàng")
+    return {
+        "id": restaurant.id,
+        "name": restaurant.name,
+        "address": restaurant.address,
+        "description": restaurant.description,
+        "owner_id": restaurant.owner_id,
+    }
+
+
+def _build_reservation_dict(r: models.Reservation) -> Dict[str, Any]:
+    """
+    Chuyển đổi đối tượng Reservation ORM sang dict đầy đủ thông tin,
+    bao gồm customer_name, customer_phone, branch_name cho frontend dashboard.
+    """
+    customer_name = "Khách hàng"
+    customer_phone = None
+    customer_email = None
+    if r.customer:
+        customer_name = r.customer.full_name or "Khách hàng"
+        customer_phone = r.customer.phone
+        # Lấy email từ user gốc qua relationship
+        if r.customer.user:
+            customer_email = r.customer.user.email
+
+    branch_name = "Chi nhánh"
+    if r.branch:
+        branch_name = r.branch.name
+
+    return {
+        "id": r.id,
+        "customer_id": r.customer_id,
+        "branch_id": r.branch_id,
+        "branch_name": branch_name,
+        "customer_name": customer_name,
+        "customer_phone": customer_phone,
+        "customer_email": customer_email,
+        "table_number": r.table_number,
+        "guest_count": r.guest_count,
+        "reservation_time": r.reservation_time.isoformat() if r.reservation_time else None,
+        "special_requests": r.special_request,
+        "special_request": r.special_request,
+        "status": r.status.value if hasattr(r.status, "value") else r.status,
+        "rejection_reason": r.rejection_reason,
+        "created_at": r.created_at.isoformat() if r.created_at else None,
+        "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+        # Nested objects cho schema compat
+        "customer": {
+            "id": r.customer.id if r.customer else r.customer_id,
+            "full_name": customer_name,
+            "phone": customer_phone,
+            "address": r.customer.address if r.customer else None,
+        },
+        "branch": {
+            "id": r.branch.id if r.branch else r.branch_id,
+            "restaurant_id": r.branch.restaurant_id if r.branch else None,
+            "name": branch_name,
+            "address": r.branch.address if r.branch else None,
+            "latitude": float(r.branch.latitude) if r.branch and r.branch.latitude else None,
+            "longitude": float(r.branch.longitude) if r.branch and r.branch.longitude else None,
+            "phone": r.branch.phone if r.branch else None,
+            "total_tables": r.branch.total_tables if r.branch else 0,
+            "available_tables": r.branch.available_tables if r.branch else 0,
+            "is_active": r.branch.is_active if r.branch else True,
+            "created_at": r.branch.created_at.isoformat() if r.branch and r.branch.created_at else None,
+        }
+    }
+
+
+@router.get("/me/reservations")
 async def list_reservations(
     status: Optional[str] = None,
     page: int = 1,
@@ -246,20 +325,33 @@ async def list_reservations(
         current_user: Người dùng hiện tại.
 
     Returns:
-        Danh sách đơn đặt bàn được sắp xếp mới nhất ở trên.
+        Danh sách đơn đặt bàn được sắp xếp mới nhất ở trên, kèm thông tin customer & branch.
     """
-    restaurant = db.query(models.Restaurant).filter(models.Restaurant.owner_id == current_user.id).first()
+    restaurant = db.query(models.Restaurant).filter(
+        models.Restaurant.owner_id == current_user.id
+    ).first()
     if not restaurant:
         return []
-        
-    query = db.query(models.Reservation).join(models.Branch).filter(models.Branch.restaurant_id == restaurant.id)
+
+    query = (
+        db.query(models.Reservation)
+        .join(models.Branch)
+        .filter(models.Branch.restaurant_id == restaurant.id)
+    )
     if status:
         query = query.filter(models.Reservation.status == status)
-        
-    query = query.order_by(models.Reservation.created_at.desc()).offset((page - 1) * limit).limit(limit)
-    return query.all()
 
-@router.patch("/me/reservations/{reservation_id}/confirm", response_model=schemas.ReservationResponse)
+    reservations = (
+        query
+        .order_by(models.Reservation.created_at.desc())
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .all()
+    )
+    return [_build_reservation_dict(r) for r in reservations]
+
+
+@router.patch("/me/reservations/{reservation_id}/confirm")
 async def confirm_res(
     reservation_id: int,
     db: Session = Depends(get_db),
@@ -267,21 +359,40 @@ async def confirm_res(
 ):
     """
     Xác nhận một đơn đặt bàn đang ở trạng thái PENDING.
-    Logic được ủy thác qua hàm mock của Dev 2.
+    Sử dụng reservation_service.confirm_reservation thật.
 
     Args:
         reservation_id: ID đơn đặt bàn.
         db: SQLAlchemy session.
         current_user: Người dùng (chủ nhà hàng).
     """
-    # Using mock until integration
-    # Return mocked or handled response 
-    res = await confirm_reservation(db, reservation_id, current_user)
-    if res:
-        return res
-    raise HTTPException(status_code=501, detail="Dev 2 chưa implement logic xác nhận")
+    # Kiểm tra quyền sở hữu: reservation phải thuộc về chi nhánh của nhà hàng này
+    restaurant = db.query(models.Restaurant).filter(
+        models.Restaurant.owner_id == current_user.id
+    ).first()
+    if not restaurant:
+        raise HTTPException(status_code=403, detail="Bạn chưa có hồ sơ nhà hàng")
 
-@router.patch("/me/reservations/{reservation_id}/reject", response_model=schemas.ReservationResponse)
+    res_check = (
+        db.query(models.Reservation)
+        .join(models.Branch)
+        .filter(
+            models.Reservation.id == reservation_id,
+            models.Branch.restaurant_id == restaurant.id
+        )
+        .first()
+    )
+    if not res_check:
+        raise HTTPException(
+            status_code=404,
+            detail="Không tìm thấy đơn đặt bàn hoặc không thuộc nhà hàng của bạn"
+        )
+
+    reservation = await reservation_service.confirm_reservation(db, reservation_id)
+    return _build_reservation_dict(reservation)
+
+
+@router.patch("/me/reservations/{reservation_id}/reject")
 async def reject_res(
     reservation_id: int,
     data: schemas.ReservationReject,
@@ -289,8 +400,8 @@ async def reject_res(
     current_user: models.User = Depends(get_current_user)
 ):
     """
-    Từ chối một đơn đặt bàn kèm theo lý do bắt buộc.
-    Logic được ủy thác qua hàm mock của Dev 2.
+    Từ chối một đơn đặt bàn kèm theo lý do bắt buộc (BR-02).
+    Sử dụng reservation_service.reject_reservation thật.
 
     Args:
         reservation_id: ID đơn đặt bàn.
@@ -298,9 +409,32 @@ async def reject_res(
         db: SQLAlchemy session.
         current_user: Người dùng hiện tại.
     """
-    if not data.reason:
+    if not data.rejection_reason or not data.rejection_reason.strip():
         raise HTTPException(status_code=422, detail="Lý do từ chối không được để trống")
-    res = await reject_reservation(db, reservation_id, data.reason, current_user)
-    if res:
-        return res
-    raise HTTPException(status_code=501, detail="Dev 2 chưa implement logic từ chối")
+
+    # Kiểm tra quyền sở hữu
+    restaurant = db.query(models.Restaurant).filter(
+        models.Restaurant.owner_id == current_user.id
+    ).first()
+    if not restaurant:
+        raise HTTPException(status_code=403, detail="Bạn chưa có hồ sơ nhà hàng")
+
+    res_check = (
+        db.query(models.Reservation)
+        .join(models.Branch)
+        .filter(
+            models.Reservation.id == reservation_id,
+            models.Branch.restaurant_id == restaurant.id
+        )
+        .first()
+    )
+    if not res_check:
+        raise HTTPException(
+            status_code=404,
+            detail="Không tìm thấy đơn đặt bàn hoặc không thuộc nhà hàng của bạn"
+        )
+
+    reservation = await reservation_service.reject_reservation(
+        db, reservation_id, data.rejection_reason.strip()
+    )
+    return _build_reservation_dict(reservation)
