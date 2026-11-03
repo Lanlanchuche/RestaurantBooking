@@ -60,7 +60,10 @@ class EmailService:
 
     def _send_sync(self, to_email: str, subject: str, html_content: str):
         if not SMTP_USER or not SMTP_PASSWORD:
-            logger.info(f"\\n[MOCK EMAIL] To: {to_email}\\n[Subject]: {subject}\\n[Body]:\\n{html_content}\\n")
+            logger.info(
+                "\n[MOCK EMAIL] To: %s\n[Subject]: %s\n[Body (truncated)]: %s\n",
+                to_email, subject, html_content[:300]
+            )
             return
         try:
             msg = MIMEMultipart("alternative")
@@ -68,7 +71,7 @@ class EmailService:
             msg["From"] = f"TableReserve <{SMTP_USER}>"
             msg["To"] = to_email
 
-            part = MIMEText(html_content, "html")
+            part = MIMEText(html_content, "html", "utf-8")
             msg.attach(part)
 
             with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
