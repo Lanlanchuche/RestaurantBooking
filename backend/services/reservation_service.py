@@ -23,23 +23,23 @@ from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from backend.models import Branch, Reservation, ReservationStatus
+from backend.models import Branch, Customer, Reservation, ReservationStatus, Restaurant
+from backend.services.email_service import email_service
 
 
 logger = logging.getLogger(__name__)
 
 
-# =========================================================
 # CONSTANTS
-# =========================================================
+
 
 MIN_GUEST_COUNT = 1
 CANCELLATION_LIMIT_HOURS = 24
 
 
-# =========================================================
+
 # BRANCH LOCKS
-# =========================================================
+
 
 _branch_locks: dict[int, asyncio.Lock] = {}
 _branch_locks_guard = asyncio.Lock()
@@ -174,38 +174,97 @@ async def send_booking_received(
     customer_id: int,
     branch: Branch,
     reservation: Reservation,
+    db,
 ) -> None:
-    """Mock gửi thông báo khi tạo đặt bàn."""
-
-    pass
+    """
+    Gửi email thông báo đặt bàn mới tới khách hàng và nhà hàng.
+    Query đủ relationship trong session (eager-load) trước khi gọi email_service.
+    """
+    from sqlalchemy.orm import joinedload
+    customer = (
+        db.query(Customer)
+        .options(joinedload(Customer.user))
+        .filter(Customer.id == customer_id)
+        .first()
+    )
+    # Eager-load branch.restaurant.owner để tránh DetachedInstanceError
+    branch_full = (
+        db.query(Branch)
+        .options(joinedload(Branch.restaurant).joinedload(Restaurant.owner))
+        .filter(Branch.id == branch.id)
+        .first()
+    ) if branch else None
+    if customer and customer.user and customer.user.email:
+        await email_service.send_booking_received(customer, branch_full or branch, reservation)
 
 
 async def send_cancelled(
     customer_id: int,
     branch: Branch,
     reservation: Reservation,
+    db,
 ) -> None:
-    """Mock gửi thông báo khi khách hủy đặt bàn."""
-
-    pass
+    """Gửi email thông báo hủy đặt bàn tới khách hàng và nhà hàng."""
+    from sqlalchemy.orm import joinedload
+    customer = (
+        db.query(Customer)
+        .options(joinedload(Customer.user))
+        .filter(Customer.id == customer_id)
+        .first()
+    )
+    branch_full = (
+        db.query(Branch)
+        .options(joinedload(Branch.restaurant).joinedload(Restaurant.owner))
+        .filter(Branch.id == branch.id)
+        .first()
+    ) if branch else None
+    if customer and customer.user and customer.user.email:
+        await email_service.send_cancelled(customer, branch_full or branch, reservation)
 
 
 async def send_confirmed(
     customer_id: int,
     reservation: Reservation,
+    db,
 ) -> None:
-    """Mock gửi thông báo khi đặt bàn được xác nhận."""
-
-    pass
+    """Gửi email thông báo xác nhận đặt bàn tới khách hàng."""
+    from sqlalchemy.orm import joinedload
+    customer = (
+        db.query(Customer)
+        .options(joinedload(Customer.user))
+        .filter(Customer.id == customer_id)
+        .first()
+    )
+    branch = (
+        db.query(Branch)
+        .filter(Branch.id == reservation.branch_id)
+        .first()
+    )
+    if customer and branch and customer.user and customer.user.email:
+        await email_service.send_confirmed(customer, branch, reservation)
 
 
 async def send_rejected(
     customer_id: int,
     reservation: Reservation,
+    db,
 ) -> None:
-    """Mock gửi thông báo khi đặt bàn bị từ chối."""
-
-    pass
+    """Gửi email thông báo từ chối đặt bàn tới khách hàng."""
+    from sqlalchemy.orm import joinedload
+    customer = (
+        db.query(Customer)
+        .options(joinedload(Customer.user))
+        .filter(Customer.id == customer_id)
+        .first()
+    )
+    branch = (
+        db.query(Branch)
+        .filter(Branch.id == reservation.branch_id)
+        .first()
+    )
+    reason = getattr(reservation, "rejection_reason", "Không rõ lý do") or "Không rõ lý do"
+    if customer and branch and customer.user and customer.user.email:
+        await email_service.send_rejected(customer, branch, reservation, reason)
 
 
 async def broadcast_to_restaurant(
@@ -394,6 +453,7 @@ async def create_reservation(
                 customer_id,
                 branch,
                 reservation,
+                db,
             ),
         )
 
@@ -602,6 +662,7 @@ async def cancel_reservation(
                 customer_id,
                 branch,
                 reservation,
+                db,
             ),
         )
 
@@ -712,6 +773,7 @@ async def confirm_reservation(
             send_confirmed(
                 reservation.customer_id,
                 reservation,
+                db,
             ),
         )
 
@@ -867,6 +929,7 @@ async def reject_reservation(
             send_rejected(
                 reservation.customer_id,
                 reservation,
+                db,
             ),
         )
 

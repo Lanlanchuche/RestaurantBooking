@@ -1,5 +1,14 @@
+import os
+import sys
 import random
 from datetime import datetime
+
+# Tự động thêm thư mục gốc vào sys.path để tránh lỗi ModuleNotFoundError trên VS Code
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.abspath(os.path.join(current_dir, ".."))
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
 from sqlalchemy.orm import Session
 from backend.database import SessionLocal, engine
 from backend.models import Base, User, UserRole, Restaurant, Branch
@@ -14,6 +23,7 @@ def seed_hanoi_data():
         # Xóa các chi nhánh và nhà hàng cũ
         db.query(Branch).delete()
         db.query(Restaurant).delete()
+        db.commit()
         
         # Tạo 10 chủ nhà hàng
         owners = []
@@ -45,7 +55,7 @@ def seed_hanoi_data():
             
             owners.append(res)
         
-        # Danh sách 30 toạ độ rải rác quanh Hà Nội (Hoàn Kiếm, Đống Đa, Ba Đình, Tây Hồ, Cầu Giấy, Thanh Xuân...)
+        # Danh sách 30 toạ độ rải rác quanh Hà Nội
         hanoi_locations = [
             ("Phở Thìn Lò Đúc", "13 Lò Đúc, Hai Bà Trưng, Hà Nội", 21.0177, 105.8569),
             ("Bún Chả Hương Liên", "24 Lê Văn Hưu, Hai Bà Trưng, Hà Nội", 21.0169, 105.8523),
