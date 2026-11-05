@@ -37,17 +37,16 @@ from backend.services.websocket_manager import manager
 logger = logging.getLogger(__name__)
 
 
-# =========================================================
 # CONSTANTS
-# =========================================================
+
 
 MIN_GUEST_COUNT = 1
 CANCELLATION_LIMIT_HOURS = 24
 
 
-# =========================================================
+
 # BRANCH LOCKS
-# =========================================================
+
 
 _branch_locks: dict[int, asyncio.Lock] = {}
 _branch_locks_guard = asyncio.Lock()
