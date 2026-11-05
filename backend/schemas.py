@@ -178,6 +178,11 @@ class ReservationCreate(BaseModel):
     guest_count: int = Field(..., gt=0)
     reservation_time: datetime
     special_request: Optional[str] = None
+    # Thông tin liên hệ khách hàng nhập ở form đặt bàn. Nếu có, backend sẽ
+    # cập nhật vào hồ sơ Customer để email thông báo và dashboard nhà hàng
+    # hiển thị đúng tên/số điện thoại người nhận bàn.
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
 
 
 class ReservationReject(BaseModel):

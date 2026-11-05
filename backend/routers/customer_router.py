@@ -134,6 +134,15 @@ async def create_reservation(
 
     customer = _get_customer(db, current_user)
 
+    contact_name = (data.customer_name or "").strip()
+    contact_phone = (data.customer_phone or "").strip()
+
+    if len(contact_phone) > 15:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Số điện thoại không hợp lệ (tối đa 15 ký tự).",
+        )
+
     return await reservation_service.create_reservation(
         db=db,
         customer_id=customer.id,
@@ -141,6 +150,8 @@ async def create_reservation(
         guest_count=data.guest_count,
         reservation_time=data.reservation_time,
         special_request=data.special_request,
+        customer_name=contact_name or None,
+        customer_phone=contact_phone or None,
     )
 
 

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from backend.database import get_db
 from backend import models, schemas, auth
@@ -32,51 +33,164 @@ class UserCreate(BaseModel):
 @router.post("/register", response_model=schemas.UserResponse, status_code=201)
 def register(user_in: UserCreate, db: Session = Depends(get_db)):
     """Đăng ký tài khoản mới."""
-    existing_user = db.query(models.User).filter(models.User.email == user_in.email).first()
+    email = user_in.email.strip()
+    full_name = user_in.name.strip()
+
+    if not full_name:
+        raise HTTPException(
+            status_code=400,
+            detail="Vui lòng nhập họ và tên.",
+        )
+
+    try:
+        role = models.UserRole(user_in.role)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Vai trò tài khoản không hợp lệ.",
+        )
+
+    if role == models.UserRole.RESTAURANT_OWNER:
+        restaurant_name = (user_in.restaurant_name or "").strip()
+
+        if not restaurant_name:
+            raise HTTPException(
+                status_code=400,
+                detail="Vui lòng nhập tên nhà hàng.",
+            )
+    else:
+        restaurant_name = ""
+
+    existing_user = (
+        db.query(models.User)
+        .filter(models.User.email == email)
+        .first()
+    )
+
     if existing_user:
-        raise HTTPException(status_code=400, detail="Email này đã được đăng ký.")
-        
+        raise HTTPException(
+            status_code=400,
+            detail="Email này đã được đăng ký.",
+        )
+
     hashed_pwd = auth.get_password_hash(user_in.password)
     new_user = models.User(
-        email=user_in.email,
+        email=email,
         hashed_password=hashed_pwd,
-        role=user_in.role
+        role=role,
     )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    
-    # Tạo profile dựa trên role
-    if user_in.role == models.UserRole.RESTAURANT_OWNER:
-        res_profile = models.Restaurant(
-            owner_id=new_user.id,
-            name=user_in.restaurant_name or f"Nhà hàng của {user_in.name}",
-            description=f"Email liên hệ: {user_in.restaurant_email or user_in.email}"
+
+    try:
+        db.add(new_user)
+        db.flush()  # Lấy new_user.id nhưng chưa commit.
+
+        # Tạo profile dựa trên role trong cùng transaction để tránh
+        # trường hợp tài khoản được tạo nhưng thiếu hồ sơ.
+        if role == models.UserRole.RESTAURANT_OWNER:
+            db.add(
+                models.Restaurant(
+                    owner_id=new_user.id,
+                    name=restaurant_name,
+                    description=(
+                        f"Email liên hệ: "
+                        f"{user_in.restaurant_email or email}"
+                    ),
+                )
+            )
+        else:
+            db.add(
+                models.Customer(
+                    user_id=new_user.id,
+                    full_name=full_name,
+                    phone=user_in.customer_phone,
+                    address=user_in.customer_address,
+                )
+            )
+
+        db.commit()
+        db.refresh(new_user)
+
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email này đã được đăng ký.",
         )
-        db.add(res_profile)
-    else:
-        # Mặc định là CUSTOMER
-        cus_profile = models.Customer(
-            user_id=new_user.id,
-            full_name=user_in.name,
-            phone=user_in.customer_phone,
-            address=user_in.customer_address
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Lỗi hệ thống khi đăng ký tài khoản.",
         )
-        db.add(cus_profile)
-    
-    db.commit()
+
     return new_user
 
 @router.post("/login")
 def login(user_credentials: UserLogin, db: Session = Depends(get_db)):
-    """Đăng nhập và nhận JWT access token."""
-    user = db.query(models.User).filter(models.User.email == user_credentials.email).first()
-    if not user or not auth.verify_password(user_credentials.password, user.hashed_password):
+    """Đăng nhập và nhận JWT access token.
+
+    Chỉ tài khoản đã đăng ký trong hệ thống mới được đăng nhập. Nếu email
+    chưa tồn tại, trả về thông báo rõ ràng để người dùng biết cần đăng ký.
+    """
+    email = user_credentials.email.strip()
+
+    user = (
+        db.query(models.User)
+        .filter(models.User.email == email)
+        .first()
+    )
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=(
+                "Tài khoản chưa được đăng ký. "
+                "Vui lòng đăng ký tài khoản trước khi đăng nhập."
+            ),
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tài khoản đã bị vô hiệu hóa.",
+        )
+
+    if not auth.verify_password(
+        user_credentials.password,
+        user.hashed_password,
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email hoặc mật khẩu không chính xác."
+            detail="Mật khẩu không chính xác.",
         )
-        
+
+    # Tài khoản chủ nhà hàng phải có hồ sơ nhà hàng thì mới dùng được
+    # dashboard nhà hàng; ngược lại báo lỗi rõ ràng thay vì đăng nhập
+    # vào một tài khoản không có dữ liệu.
+    if (
+        user.role == models.UserRole.RESTAURANT_OWNER
+        and user.restaurant_profile is None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Tài khoản chủ nhà hàng chưa có hồ sơ nhà hàng. "
+                "Vui lòng đăng ký lại hoặc liên hệ quản trị viên."
+            ),
+        )
+
+    if (
+        user.role == models.UserRole.CUSTOMER
+        and user.customer_profile is None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Tài khoản khách hàng chưa có hồ sơ. "
+                "Vui lòng đăng ký lại hoặc liên hệ quản trị viên."
+            ),
+        )
+
     access_token = auth.create_access_token(data={"sub": user.email, "role": user.role.value if hasattr(user.role, 'value') else user.role})
     # Lấy tên từ profile tương ứng
     user_name = "Khách"

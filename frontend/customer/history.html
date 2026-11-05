@@ -23,6 +23,7 @@
                 </div>
             </div>
             <button type="button" id="btn-logout" class="btn-ghost dash-logout">Đăng xuất</button>
+            <button type="button" class="theme-toggle" aria-label="Chuyển đổi giao diện sáng/tối">🌙</button>
         </header>
 
         <div class="dash-layout">
@@ -53,7 +54,7 @@
                     <p class="history-stat-label">Tổng lượt đặt</p>
                 </div>
                 <div class="history-stat-card">
-                    <div id="stat-pending" class="history-stat-val" style="color:#b78103;">0</div>
+                    <div id="stat-pending" class="history-stat-val" style="color:var(--orange-deep);">0</div>
                     <p class="history-stat-label">Chờ xác nhận</p>
                 </div>
                 <div class="history-stat-card">
@@ -86,6 +87,7 @@
     <script src="../js/auth.js"></script>
     <script src="../js/api.js"></script>
     <script src="../js/history.js"></script>
+    <script src="../js/theme.js"></script>
 </body>
 
 </html>
