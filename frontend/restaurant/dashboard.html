@@ -26,6 +26,7 @@
                 </div>
             </div>
             <button type="button" id="btn-logout" class="btn-ghost dash-logout">Đăng xuất</button>
+            <button type="button" class="theme-toggle" aria-label="Chuyển đổi giao diện sáng/tối">🌙</button>
         </header>
 
         <!-- Thanh Navigation chính: Trang chủ, Đơn đặt bàn, Quản lý chi nhánh -->
@@ -264,7 +265,7 @@
                 <button type="button" class="modal-close-btn" data-close-modal="modal-reject" aria-label="Đóng">&times;</button>
             </div>
             <div class="modal-body">
-                <div style="background:#fff3e0; border:1px solid #ffe0b2; color:#b78103; padding:12px 14px; border-radius:12px; font-size:0.86rem; margin-bottom:16px;">
+                <div style="background:var(--orange-soft); border:1px solid var(--orange-light); color:var(--orange-deep); padding:12px 14px; border-radius:12px; font-size:0.86rem; margin-bottom:16px;">
                     <strong>⚠️ Quy tắc nghiệp vụ (BR-02):</strong> Khi từ chối, nhà hàng <strong>bắt buộc phải nhập lý do</strong>. Bàn trống sẽ được hoàn trả tự động và email thông báo sẽ được gửi tới khách.
                 </div>
 
@@ -373,6 +374,7 @@
     <script src="../js/auth.js"></script>
     <script src="../js/api.js"></script>
     <script src="../js/dashboard.js"></script>
+    <script src="../js/theme.js"></script>
 </body>
 
 </html>
