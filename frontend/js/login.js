@@ -118,43 +118,11 @@ document.addEventListener("DOMContentLoaded", () => {
             }, 300);
             return;
         } catch (err) {
-            const cannotReachServer = /Không kết nối được máy chủ/.test(err.message || "");
-            if (cannotReachServer) {
-                let savedDemoUsers = [];
-                try {
-                    savedDemoUsers = JSON.parse(localStorage.getItem("registered_demo_users") || "[]");
-                } catch {
-                    savedDemoUsers = [];
-                }
-                const found = savedDemoUsers.find((u) => u.email.toLowerCase() === email.toLowerCase());
-
-                const localUser = found ? {
-                    name: found.name,
-                    email: found.email,
-                    role: found.role || "CUSTOMER",
-                    phone: found.phone || found.restaurant_phone || "",
-                    address: found.address || "",
-                } : {
-                    name: email.split("@")[0] || "Khách",
-                    email,
-                    role: "CUSTOMER",
-                    phone: "",
-                    address: "",
-                };
-
-                setAuthData("local-demo-token", localUser);
-                showLoginSuccess("Đăng nhập thành công! Đang chuyển đến bảng điều khiển...");
-                if (typeof showToast === "function") {
-                    showToast("Đăng nhập thành công!", "success");
-                }
-
-                const destination = redirectUrl || dashboardHref(localUser.role);
-                setTimeout(() => {
-                    location.href = destination;
-                }, 300);
-                return;
-            }
-            showLoginError(err.message || "Đăng nhập thất bại.");
+            // Không còn chế độ "đăng nhập offline": chỉ tài khoản đã đăng ký
+            // trong database mới được đăng nhập.
+            showLoginError(
+                err.message || "Đăng nhập thất bại. Vui lòng thử lại."
+            );
         } finally {
             submitBtn.disabled = false;
             setLoading(false);

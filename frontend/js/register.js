@@ -235,44 +235,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 location.href = `login.html?registered=1&email=${encodeURIComponent(email)}`;
             }, 1200);
         } catch (err) {
-            const cannotReachServer = /Không kết nối được máy chủ/.test(err.message || "");
-            if (cannotReachServer) {
-                // Lưu user vào danh sách demo offline để đăng nhập nhận diện đúng vai trò
-                try {
-                    const saved = JSON.parse(localStorage.getItem("registered_demo_users") || "[]");
-                    const userRecord = {
-                        name,
-                        email,
-                        role,
-                        phone: restaurantPhone || "",
-                        restaurant_name: restaurantName || "",
-                        created_at: new Date().toISOString()
-                    };
-                    const existingIdx = saved.findIndex((u) => u.email.toLowerCase() === email.toLowerCase());
-                    if (existingIdx >= 0) {
-                        saved[existingIdx] = userRecord;
-                    } else {
-                        saved.push(userRecord);
-                    }
-                    localStorage.setItem("registered_demo_users", JSON.stringify(saved));
-                } catch (e) {
-                    console.warn("Could not save demo user", e);
-                }
-
-                if (typeof clearAuth === "function") {
-                    clearAuth();
-                }
-
-                showRegisterSuccess("Đăng ký tài khoản thành công! Đang chuyển đến trang đăng nhập...");
-                if (typeof showToast === "function") {
-                    showToast("Đăng ký thành công! Vui lòng đăng nhập để tiếp tục.", "success");
-                }
-                setTimeout(() => {
-                    location.href = `login.html?registered=1&email=${encodeURIComponent(email)}`;
-                }, 1000);
-                return;
-            }
-            showRegisterError(err.message || "Đăng ký thất bại. Vui lòng thử lại sau.");
+            // Không còn đăng ký offline: tài khoản chỉ được tạo khi backend
+            // lưu thành công vào database.
+            showRegisterError(
+                err.message || "Đăng ký thất bại. Vui lòng thử lại sau."
+            );
         } finally {
             submitBtn.disabled = false;
             if (typeof setLoading === "function") {

@@ -250,6 +250,12 @@ function disconnectDashboardWS() {
     }
     if (_ws) {
         try {
+            // Gỡ hết handler trước khi close, nếu không onclose sẽ lên lịch
+            // tự kết nối lại sau 5 giây (kể cả khi đã đăng xuất).
+            _ws.onopen = null;
+            _ws.onmessage = null;
+            _ws.onerror = null;
+            _ws.onclose = null;
             _ws.close();
         } catch {
             // Ignore close error
@@ -712,10 +718,14 @@ async function submitRejectReservation() {
 // DOM INITIALIZATION
 // ==========================================================================
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
     // 1. Kiểm tra xác thực (Quyền RESTAURANT_OWNER)
     const currentUser = requireAuth("RESTAURANT_OWNER");
     if (!currentUser) return;
+
+    // Sự kiện Đăng xuất được gắn tập trung trong auth.js (bắt sự kiện ở
+    // cấp document) nên nút luôn hoạt động kể cả khi phần khởi tạo bên
+    // dưới gặp lỗi.
 
     // Cập nhật thông tin định danh người quản lý trên Navbar
     const ownerNameEl = document.getElementById("owner-name");
@@ -745,15 +755,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // 4. Khởi tạo kết nối WebSocket với auto-reconnect
     connectDashboardWS(_restaurantId, handleNewIncomingReservation);
-
-    // 5. Sự kiện Đăng xuất
-    const logoutBtn = document.getElementById("btn-logout");
-    if (logoutBtn) {
-        logoutBtn.addEventListener("click", () => {
-            disconnectDashboardWS();
-            logout();
-        });
-    }
 
     // 5. Nút Làm mới dữ liệu
     const refreshBtn = document.getElementById("btn-refresh");

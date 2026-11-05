@@ -24,7 +24,26 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         raise credentials_exception
         
     user = db.query(models.User).filter(models.User.email == email).first()
-    if user is None:
+    if user is None or not user.is_active:
         raise credentials_exception
-        
+
     return user
+
+
+def get_current_restaurant_owner(
+    current_user: models.User = Depends(get_current_user),
+) -> models.User:
+    """
+    Chỉ cho phép tài khoản RESTAURANT_OWNER truy cập API dành cho nhà hàng.
+
+    CUSTOMER sẽ nhận lỗi 403 thay vì có thể gọi các API quản lý
+    nhà hàng/chi nhánh/đặt bàn.
+    """
+
+    if current_user.role != models.UserRole.RESTAURANT_OWNER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Chỉ tài khoản chủ nhà hàng mới được truy cập chức năng này.",
+        )
+
+    return current_user

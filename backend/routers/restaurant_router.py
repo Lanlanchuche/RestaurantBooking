@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
-from backend.dependencies import get_current_user
+from backend.dependencies import get_current_restaurant_owner
 from backend import models, schemas
 from backend.services import reservation_service
 
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/api/restaurant", tags=["Restaurant"])
 async def create_restaurant(
     data: schemas.RestaurantCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_restaurant_owner)
 ):
     """
     Tạo mới hồ sơ nhà hàng cho tài khoản hiện tại.
@@ -53,7 +53,7 @@ async def create_restaurant(
 @router.get("/me", response_model=schemas.RestaurantResponse)
 async def get_my_restaurant(
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_restaurant_owner)
 ):
     """
     Lấy thông tin nhà hàng của tài khoản hiện tại.
@@ -77,7 +77,7 @@ async def get_my_restaurant(
 async def update_my_restaurant(
     data: schemas.RestaurantCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_restaurant_owner)
 ):
     """
     Cập nhật thông tin hồ sơ nhà hàng.
@@ -104,7 +104,7 @@ async def update_my_restaurant(
 @router.get("/me/branches", response_model=List[schemas.BranchResponse])
 async def list_branches(
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_restaurant_owner)
 ):
     """
     Lấy danh sách tất cả chi nhánh thuộc về nhà hàng của người dùng.
@@ -125,7 +125,7 @@ async def list_branches(
 async def add_branch(
     data: schemas.BranchCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_restaurant_owner)
 ):
     """
     Thêm một chi nhánh mới cho nhà hàng.
@@ -158,7 +158,7 @@ async def edit_branch(
     branch_id: int,
     data: schemas.BranchUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_restaurant_owner)
 ):
     """
     Chỉnh sửa thông tin chi nhánh.
@@ -201,7 +201,7 @@ async def edit_branch(
 async def delete_branch(
     branch_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_restaurant_owner)
 ):
     """
     Xóa một chi nhánh khỏi hệ thống.
@@ -227,7 +227,7 @@ async def delete_branch(
 @router.get("/me/info")
 async def get_restaurant_info(
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_restaurant_owner)
 ):
     """
     Lấy thông tin cơ bản nhà hàng (bao gồm restaurant_id) cho frontend.
@@ -312,7 +312,7 @@ async def list_reservations(
     page: int = 1,
     limit: int = 50,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_restaurant_owner)
 ):
     """
     Lấy danh sách các đơn đặt bàn gửi đến nhà hàng, có hỗ trợ phân trang và lọc.
@@ -355,7 +355,7 @@ async def list_reservations(
 async def confirm_res(
     reservation_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_restaurant_owner)
 ):
     """
     Xác nhận một đơn đặt bàn đang ở trạng thái PENDING.
@@ -397,7 +397,7 @@ async def reject_res(
     reservation_id: int,
     data: schemas.ReservationReject,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_restaurant_owner)
 ):
     """
     Từ chối một đơn đặt bàn kèm theo lý do bắt buộc (BR-02).

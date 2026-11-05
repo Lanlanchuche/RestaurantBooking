@@ -1,5 +1,6 @@
 const TOKEN_KEY = "token";
 const USER_KEY = "user";
+const LEGACY_DEMO_TOKEN = "local-demo-token";
 
 function getToken() {
     return localStorage.getItem(TOKEN_KEY);
@@ -14,7 +15,17 @@ function getUser() {
 }
 
 function isLoggedIn() {
-    return Boolean(getToken());
+    const token = getToken();
+
+    // Token demo cũ (đăng nhập offline) không còn hợp lệ.
+    if (!token || token === LEGACY_DEMO_TOKEN) {
+        if (token) {
+            clearAuth();
+        }
+        return false;
+    }
+
+    return true;
 }
 
 function setAuthData(token, user) {
@@ -53,8 +64,9 @@ function requireAuth(requiredRole = "CUSTOMER") {
     const token = getToken();
     let user = getUser();
 
-    if (!token) {
-        // Chưa đăng nhập -> chuyển đến trang đăng nhập
+    if (!token || token === LEGACY_DEMO_TOKEN) {
+        // Chưa đăng nhập (hoặc token demo cũ) -> chuyển đến trang đăng nhập
+        clearAuth();
         location.href = authPageHref("login.html");
         return null;
     }
@@ -82,9 +94,60 @@ function redirectIfLoggedIn() {
     }
 }
 
+let _loggingOut = false;
+
 function logout() {
+    // Chống gọi lặp (ví dụ vừa có handler riêng của trang vừa có handler
+    // dự phòng toàn cục bên dưới) để không điều hướng hai lần.
+    if (_loggingOut) return;
+    _loggingOut = true;
+
+    // Ngắt WebSocket realtime (nếu trang hiện tại có) trước khi xoá phiên.
+    try {
+        if (typeof disconnectDashboardWS === "function") {
+            disconnectDashboardWS();
+        }
+    } catch (err) {
+        console.warn("[auth] Không ngắt được WebSocket khi đăng xuất:", err);
+    }
+
     clearAuth();
-    location.href = authPageHref("login.html");
+
+    try {
+        sessionStorage.clear();
+    } catch {
+        // Ignore storage errors (chế độ riêng tư, v.v.)
+    }
+
+    const destination = authPageHref("login.html");
+
+    // replace() để nút Back của trình duyệt không quay lại dashboard sau
+    // khi đã đăng xuất.
+    if (typeof window.location.replace === "function") {
+        window.location.replace(destination);
+    } else {
+        window.location.href = destination;
+    }
 }
+
+// --------------------------------------------------------------------------
+// Dự phòng: luôn bắt sự kiện nút Đăng xuất ở cấp document.
+// Nhờ vậy nút vẫn hoạt động kể cả khi script riêng của trang
+// (dashboard.js, branches.js, book.js, history.js...) gặp lỗi hoặc
+// chưa kịp gắn sự kiện.
+// --------------------------------------------------------------------------
+const LOGOUT_BUTTON_SELECTOR =
+    "#btn-logout, #btn-branches-logout, #btn-hist-logout, [data-logout]";
+
+document.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+
+    const btn = target.closest(LOGOUT_BUTTON_SELECTOR);
+    if (!btn) return;
+
+    event.preventDefault();
+    logout();
+});
 
 

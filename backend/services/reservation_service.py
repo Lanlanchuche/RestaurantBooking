@@ -21,9 +21,17 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
-from backend.models import Branch, Reservation, ReservationStatus
+from backend.models import (
+    Branch,
+    Customer,
+    Reservation,
+    ReservationStatus,
+    Restaurant,
+)
+from backend.services.email_service import email_service
+from backend.services.websocket_manager import manager
 
 
 logger = logging.getLogger(__name__)
@@ -164,57 +172,41 @@ def _validate_can_return_table(branch: Branch) -> None:
 
 
 # =========================================================
-# MOCK EXTERNAL SERVICES
+# EXTERNAL SERVICES
 # =========================================================
-# Dùng tạm trong thời gian Dev 3 chưa hoàn thành.
-# Sau này có thể thay bằng email_service và websocket_manager.
+
+# Giữ tham chiếu tới các background task để tránh bị garbage collector
+# thu hồi trước khi chúng chạy xong.
+_background_tasks: set[asyncio.Task] = set()
 
 
-async def send_booking_received(
-    customer_id: int,
-    branch: Branch,
-    reservation: Reservation,
-) -> None:
-    """Mock gửi thông báo khi tạo đặt bàn."""
+def _load_notification_context(
+    db: Session,
+    reservation_id: int,
+) -> Reservation | None:
+    """
+    Nạp reservation kèm toàn bộ quan hệ cần cho việc gửi thông báo.
 
-    pass
+    Email/WebSocket chạy trong background task, có thể sau khi request
+    session đã đóng. Vì vậy phải eager-load trước:
+    - reservation.customer.user (email khách hàng)
+    - reservation.branch.restaurant.owner (email chủ nhà hàng)
 
+    Nếu không eager-load, việc truy cập các quan hệ này trong background
+    task sẽ phát sinh lazy load trên session đã đóng và gây lỗi.
+    """
 
-async def send_cancelled(
-    customer_id: int,
-    branch: Branch,
-    reservation: Reservation,
-) -> None:
-    """Mock gửi thông báo khi khách hủy đặt bàn."""
-
-    pass
-
-
-async def send_confirmed(
-    customer_id: int,
-    reservation: Reservation,
-) -> None:
-    """Mock gửi thông báo khi đặt bàn được xác nhận."""
-
-    pass
-
-
-async def send_rejected(
-    customer_id: int,
-    reservation: Reservation,
-) -> None:
-    """Mock gửi thông báo khi đặt bàn bị từ chối."""
-
-    pass
-
-
-async def broadcast_to_restaurant(
-    restaurant_id: int,
-    payload: dict,
-) -> None:
-    """Mock broadcast WebSocket tới nhà hàng."""
-
-    pass
+    return (
+        db.query(Reservation)
+        .options(
+            joinedload(Reservation.customer).joinedload(Customer.user),
+            joinedload(Reservation.branch)
+            .joinedload(Branch.restaurant)
+            .joinedload(Restaurant.owner),
+        )
+        .filter(Reservation.id == reservation_id)
+        .first()
+    )
 
 
 async def _run_external_task(
@@ -246,12 +238,14 @@ def _create_external_task(
     Lỗi của Email/WebSocket không làm request chính thất bại.
     """
 
-    asyncio.create_task(
+    task = asyncio.create_task(
         _run_external_task(
             task_name,
             coroutine,
         )
     )
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
 
 
 # =========================================================
@@ -266,6 +260,8 @@ async def create_reservation(
     reservation_time: datetime,
     special_request: str | None = None,
     table_number: int | None = None,
+    customer_name: str | None = None,
+    customer_phone: str | None = None,
 ) -> Reservation:
     """
     Tạo một đặt chỗ mới.
@@ -275,10 +271,11 @@ async def create_reservation(
     2. Lock branch.
     3. Kiểm tra branch.
     4. Kiểm tra bàn trống.
-    5. Tạo reservation PENDING.
-    6. Giảm available_tables.
-    7. Commit transaction.
-    8. Gửi notification/background task.
+    5. Cập nhật thông tin liên hệ của khách (nếu form có nhập).
+    6. Tạo reservation PENDING.
+    7. Giảm available_tables.
+    8. Commit transaction.
+    9. Gửi notification/background task.
     """
 
     # -----------------------------------------------------
@@ -338,7 +335,32 @@ async def create_reservation(
             )
 
         # -------------------------------------------------
-        # 5. Create reservation
+        # 5. Cập nhật thông tin liên hệ của khách hàng
+        # -------------------------------------------------
+
+        # Form đặt bàn cho phép khách nhập tên/số điện thoại liên hệ.
+        # Lưu vào hồ sơ Customer để email thông báo và dashboard nhà hàng
+        # hiển thị đúng số điện thoại (trước đây các giá trị này bị bỏ qua).
+        customer = (
+            db.query(Customer)
+            .filter(Customer.id == customer_id)
+            .first()
+        )
+
+        if customer is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Không tìm thấy hồ sơ khách hàng.",
+            )
+
+        if customer_name:
+            customer.full_name = customer_name
+
+        if customer_phone:
+            customer.phone = customer_phone
+
+        # -------------------------------------------------
+        # 6. Create reservation
         # -------------------------------------------------
 
         reservation = Reservation(
@@ -352,7 +374,7 @@ async def create_reservation(
         )
 
         # -------------------------------------------------
-        # 6. Decrease available tables
+        # 7. Decrease available tables
         # -------------------------------------------------
 
         branch.available_tables -= 1
@@ -360,7 +382,7 @@ async def create_reservation(
         db.add(reservation)
 
         # -------------------------------------------------
-        # 7. Commit
+        # 8. Commit
         # -------------------------------------------------
 
         try:
@@ -385,28 +407,40 @@ async def create_reservation(
             )
 
         # -------------------------------------------------
-        # 8. External services
+        # 9. External services
         # -------------------------------------------------
 
-        _create_external_task(
-            "send_booking_received",
-            send_booking_received(
-                customer_id,
-                branch,
-                reservation,
-            ),
-        )
+        notification = _load_notification_context(db, reservation.id)
 
-        _create_external_task(
-            "broadcast_new_reservation",
-            broadcast_to_restaurant(
-                branch.restaurant_id,
-                {
-                    "event": "new_reservation",
-                    "data": reservation.id,
-                },
-            ),
-        )
+        if (
+            notification is None
+            or notification.customer is None
+            or notification.branch is None
+        ):
+            logger.warning(
+                "Không tìm thấy đủ dữ liệu để gửi thông báo cho reservation %s.",
+                reservation.id,
+            )
+        else:
+            _create_external_task(
+                "send_booking_received",
+                email_service.send_booking_received(
+                    notification.customer,
+                    notification.branch,
+                    notification,
+                ),
+            )
+
+            _create_external_task(
+                "broadcast_new_reservation",
+                manager.broadcast_to_restaurant(
+                    notification.branch.restaurant_id,
+                    {
+                        "event": "new_reservation",
+                        "data": reservation.id,
+                    },
+                ),
+            )
 
         return reservation
 
@@ -596,14 +630,26 @@ async def cancel_reservation(
         # 11. External service
         # -------------------------------------------------
 
-        _create_external_task(
-            "send_cancelled",
-            send_cancelled(
-                customer_id,
-                branch,
-                reservation,
-            ),
-        )
+        notification = _load_notification_context(db, reservation.id)
+
+        if (
+            notification is None
+            or notification.customer is None
+            or notification.branch is None
+        ):
+            logger.warning(
+                "Không tìm thấy đủ dữ liệu để gửi email hủy cho reservation %s.",
+                reservation.id,
+            )
+        else:
+            _create_external_task(
+                "send_cancelled",
+                email_service.send_cancelled(
+                    notification.customer,
+                    notification.branch,
+                    notification,
+                ),
+            )
 
         return reservation
 
@@ -707,13 +753,26 @@ async def confirm_reservation(
         # 7. External service
         # -------------------------------------------------
 
-        _create_external_task(
-            "send_confirmed",
-            send_confirmed(
-                reservation.customer_id,
-                reservation,
-            ),
-        )
+        notification = _load_notification_context(db, reservation.id)
+
+        if (
+            notification is None
+            or notification.customer is None
+            or notification.branch is None
+        ):
+            logger.warning(
+                "Không tìm thấy đủ dữ liệu để gửi email xác nhận cho reservation %s.",
+                reservation.id,
+            )
+        else:
+            _create_external_task(
+                "send_confirmed",
+                email_service.send_confirmed(
+                    notification.customer,
+                    notification.branch,
+                    notification,
+                ),
+            )
 
         return reservation
 
@@ -862,13 +921,27 @@ async def reject_reservation(
         # 10. External service
         # -------------------------------------------------
 
-        _create_external_task(
-            "send_rejected",
-            send_rejected(
-                reservation.customer_id,
-                reservation,
-            ),
-        )
+        notification = _load_notification_context(db, reservation.id)
+
+        if (
+            notification is None
+            or notification.customer is None
+            or notification.branch is None
+        ):
+            logger.warning(
+                "Không tìm thấy đủ dữ liệu để gửi email từ chối cho reservation %s.",
+                reservation.id,
+            )
+        else:
+            _create_external_task(
+                "send_rejected",
+                email_service.send_rejected(
+                    notification.customer,
+                    notification.branch,
+                    notification,
+                    reason,
+                ),
+            )
 
         return reservation
 

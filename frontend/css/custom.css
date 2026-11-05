@@ -331,6 +331,12 @@
     animation: slideDownBanner 0.35s ease;
 }
 
+/* `display: flex` ở trên ghi đè thuộc tính `hidden` của trình duyệt,
+   nên phải khai báo tường minh để banner thực sự ẩn khi chưa có đơn mới. */
+.live-alert-banner[hidden] {
+    display: none;
+}
+
 .live-alert-content {
     display: flex;
     align-items: center;
