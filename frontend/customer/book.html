@@ -5,8 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Đặt Bàn — TableReserve</title>
-    <meta name="description" content="Đặt bàn nhà hàng trực tuyến: chọn ngày giờ, số khách và bàn ăn yêu thích trên sơ đồ trực quan.">
-    <meta name="theme-color" content="#f6efe4">
+    <meta name="description" content="Đặt bàn nhà hàng trực tuyến: chọn chi nhánh gần nhất trên bản đồ, ngày giờ và số khách.">
 
     <!-- Áp dụng theme trước khi render để tránh nháy sáng/tối -->
     <script>
@@ -24,339 +23,284 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,600&family=Source+Sans+3:wght@400;500;600;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Source+Sans+3:wght@400;500;600;700&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="../css/booking.css">
+    <link rel="stylesheet" href="../css/style.css">
+
+    <!-- Leaflet Map CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 </head>
 
-<body class="bk-body">
-    <div class="bk-shell">
+<body class="app-body">
+    <div class="app-shell">
         <!-- ================= HEADER ================= -->
-        <header class="bk-header">
-            <a class="bk-brand" href="dashboard.html" aria-label="TableReserve — về bảng điều khiển">
-                <span class="bk-brand-mark" aria-hidden="true">🍽</span>
-                <span class="bk-brand-text">
-                    <strong>TableReserve</strong>
-                    <small>Dining, reserved</small>
-                </span>
-            </a>
-
-            <nav class="bk-nav" aria-label="Điều hướng chính">
-                <a href="dashboard.html">Tổng quan</a>
-                <a href="book.html" class="is-active" aria-current="page">Đặt bàn</a>
-                <a href="history.html">Lịch sử</a>
-            </nav>
-
-            <div class="bk-header-actions">
-                <button type="button" id="theme-toggle" class="bk-theme-toggle" aria-label="Chuyển giao diện sáng/tối"
-                    aria-pressed="false" title="Chuyển giao diện sáng/tối">
-                    <span class="bk-theme-icon sun" aria-hidden="true">☀</span>
-                    <span class="bk-theme-icon moon" aria-hidden="true">☾</span>
-                    <span class="bk-theme-knob" aria-hidden="true"></span>
-                </button>
-
-                <div class="bk-user">
-                    <span class="bk-user-avatar" id="bk-user-avatar" aria-hidden="true">?</span>
-                    <span class="bk-user-name" id="bk-user-name">Khách</span>
+        <header class="dash-header">
+            <div class="dash-identity">
+                <div id="dash-avatar" class="dash-avatar" aria-hidden="true">?</div>
+                <div class="dash-identity-text">
+                    <p class="dash-greet">Xin chào</p>
+                    <h1 id="dash-user-name">Khách</h1>
                 </div>
             </div>
             <button type="button" id="btn-logout" class="btn-ghost dash-logout">Đăng xuất</button>
             <button type="button" class="theme-toggle" aria-label="Chuyển đổi giao diện sáng/tối">🌙</button>
         </header>
 
-        <!-- ================= HERO ================= -->
-        <section class="bk-hero" aria-labelledby="booking-heading">
-            <div>
-                <p class="bk-eyebrow">Đặt bàn trực tuyến</p>
-                <h1 id="booking-heading">Chọn bàn, chọn thời gian,<br><em>giữ chỗ trong vài giây.</em></h1>
-                <p class="bk-hero-sub">
-                    Chọn khung giờ phù hợp, xem sơ đồ bàn trống theo thời gian thực và xác nhận ngay.
-                    Chúng tôi giữ bàn cho bạn trong 15 phút.
-                </p>
-            </div>
-            <div class="bk-hero-meta">
-                <span>⏱ Giữ bàn 15 phút</span>
-                <span>✓ Xác nhận tức thì</span>
-                <span>↺ Hủy miễn phí trước 24 giờ</span>
-            </div>
-        </section>
+        <!-- ================= LAYOUT: SIDEBAR + MAIN ================= -->
+        <div class="dash-layout">
+            <!-- Sidebar: giống màn hình Thông tin cá nhân & Lịch sử -->
+            <aside class="dash-sidebar" aria-label="Menu tài khoản">
+                <a href="dashboard.html" class="dash-nav-btn">
+                    Thông tin cá nhân
+                </a>
+                <a href="book.html" class="dash-nav-btn active" aria-current="page">
+                    Đặt bàn
+                </a>
+                <a href="history.html" class="dash-nav-btn">
+                    Lịch sử
+                </a>
+            </aside>
 
-        <!-- ================= MAIN ================= -->
-        <div class="bk-layout">
-            <!-- ---------- LEFT: FORM ---------- -->
-            <form id="booking-form" class="bk-panel bk-form" novalidate>
-                <div class="bk-panel-head">
-                    <div>
-                        <span class="bk-step">01</span>
-                        <h2>Thông tin đặt bàn</h2>
-                    </div>
-                    <span class="bk-panel-note">Bắt buộc *</span>
-                </div>
-
-                <div id="form-alert" class="bk-form-alert" role="alert" hidden></div>
-
-                <!-- Branch -->
-                <fieldset class="bk-group">
-                    <legend class="bk-legend">Chi nhánh</legend>
-
-                    <div class="bk-branch-row">
-                        <label class="bk-field bk-branch-field">
-                            <span class="bk-visually-hidden">Chọn chi nhánh</span>
-                            <select id="branch-select" class="bk-input bk-select" aria-label="Chọn chi nhánh">
-                                <option value="">Đang tải chi nhánh...</option>
-                            </select>
-                        </label>
-
-                        <button type="button" id="btn-nearby" class="bk-chip bk-nearby" title="Dùng vị trí hiện tại">
-                            📍 Gần tôi
-                        </button>
-                    </div>
-
-                    <p class="bk-branch-meta" id="branch-meta" role="status">
-                        Đang tải danh sách chi nhánh...
+            <!-- Main content -->
+            <main class="dash-main">
+                <!-- Hero header -->
+                <div class="booking-hero-header">
+                    <h1 class="booking-hero-title">Đặt Bàn Trực Tuyến</h1>
+                    <p class="booking-hero-desc">
+                        Chọn địa chỉ, xem chi nhánh gần nhất trên bản đồ, rồi đặt bàn trong vài bước.
                     </p>
-                </fieldset>
+                </div>
 
-                <!-- Date -->
-                <fieldset class="bk-group">
-                    <legend class="bk-legend">Ngày dùng bữa</legend>
-                    <div class="bk-date-chips" id="date-chips" role="group" aria-label="Chọn nhanh ngày"></div>
-                    <input type="date" id="booking-date" class="bk-input" aria-label="Chọn ngày dùng bữa">
-                </fieldset>
-
-                <!-- Time -->
-                <fieldset class="bk-group">
-                    <legend class="bk-legend">Giờ nhận bàn</legend>
-
-                    <div class="bk-session">
-                        <div class="bk-session-label">Bữa trưa · 11:00 – 14:00</div>
-                        <div class="bk-time-grid" data-session="lunch" role="group" aria-label="Khung giờ bữa trưa">
-                            <button type="button" class="bk-time" data-time="11:00">11:00</button>
-                            <button type="button" class="bk-time" data-time="11:30">11:30</button>
-                            <button type="button" class="bk-time" data-time="12:00">12:00</button>
-                            <button type="button" class="bk-time" data-time="12:30">12:30</button>
-                            <button type="button" class="bk-time" data-time="13:00">13:00</button>
-                            <button type="button" class="bk-time" data-time="13:30">13:30</button>
+                <!-- ================= ĐỊA CHỈ (trước bản đồ) ================= -->
+                <section class="booking-card" aria-labelledby="address-heading" style="margin-bottom: 22px;">
+                    <div class="booking-card-header">
+                        <div class="booking-card-title-wrap">
+                            <span class="card-step-badge">1</span>
+                            <div>
+                                <h2 id="address-heading" class="booking-card-title">Địa chỉ giao hàng / liên hệ</h2>
+                                <p class="booking-card-subtitle">
+                                    Nhập địa chỉ hoặc lấy từ vị trí hiện tại để hệ thống gợi ý chi nhánh gần bạn nhất.
+                                </p>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="bk-session">
-                        <div class="bk-session-label">Bữa tối · 17:30 – 21:30</div>
-                        <div class="bk-time-grid" data-session="dinner" role="group" aria-label="Khung giờ bữa tối">
-                            <button type="button" class="bk-time" data-time="17:30">17:30</button>
-                            <button type="button" class="bk-time" data-time="18:00">18:00</button>
-                            <button type="button" class="bk-time" data-time="18:30">18:30</button>
-                            <button type="button" class="bk-time" data-time="19:00">19:00</button>
-                            <button type="button" class="bk-time" data-time="19:30">19:30</button>
-                            <button type="button" class="bk-time" data-time="20:00">20:00</button>
-                            <button type="button" class="bk-time" data-time="20:30">20:30</button>
-                            <button type="button" class="bk-time" data-time="21:00">21:00</button>
+                    <div class="form-group address-field-group">
+                        <label class="bk-label">Địa chỉ</label>
+                        <div class="address-field-wrap">
+                            <textarea id="book-address" name="address" rows="3" autocomplete="street-address"
+                                placeholder="Số nhà, đường, phường/xã, tỉnh/thành"></textarea>
+                            <div class="address-actions">
+                                <button type="button" id="btn-get-location" class="btn-ghost address-btn"
+                                    title="Lấy địa chỉ từ vị trí hiện tại">📍 Lấy vị trí hiện tại</button>
+                                <button type="button" id="btn-default-address" class="btn-ghost address-btn"
+                                    title="Dùng địa chỉ mặc định">🏠 Địa chỉ mặc định</button>
+                            </div>
+                        </div>
+                        <p class="field-hint">Bạn có thể tự điền hoặc dùng nút bên để lấy vị trí nhanh.</p>
+                    </div>
+                </section>
+
+                <!-- ================= MAP + TOP 5 BRANCHES ================= -->
+                <section class="branch-map-top5-layout" style="margin-bottom: 26px;">
+                    <!-- Bản đồ Leaflet -->
+                    <div class="branch-map-container-wrap">
+                        <div class="map-toolbar">
+                            <button type="button" id="btn-show-nearest" class="map-btn-show-nearest"
+                                title="Hiển thị 5 chi nhánh gần nhất trên bản đồ">
+                                🔍 Hiển thị 5 chi nhánh gần nhất
+                            </button>
+                            <span id="map-status" class="map-status-text">Chưa có địa chỉ — nhập địa chỉ hoặc lấy vị trí hiện tại</span>
+                        </div>
+                        <div id="booking-map" class="booking-leaflet-map" aria-label="Bản đồ các chi nhánh nhà hàng"></div>
+                        <div class="map-controls-footer">
+                            <span id="map-selected-info">Chưa chọn chi nhánh nào</span>
                         </div>
                     </div>
-                </fieldset>
 
-                <!-- Guests -->
-                <fieldset class="bk-group">
-                    <legend class="bk-legend">Số lượng khách</legend>
+                    <!-- Sidebar Top 5 chi nhánh gần nhất -->
+                    <aside class="branch-top5-sidebar">
+                        <div class="top5-sidebar-header">
+                            <div class="top5-title-group">
+                                <span class="top5-header-icon">📍</span>
+                                <h3 class="top5-header-title">Chi Nhánh Gần Nhất</h3>
+                            </div>
+                            <span class="top5-count-badge" id="top5-count">0</span>
+                        </div>
+                        <div id="top-branches-list" class="top5-restaurants-scroll" role="list"
+                            aria-label="Danh sách top 5 chi nhánh gần nhất">
+                            <!-- Các card chi nhánh sẽ được render bởi book.js -->
+                        </div>
+                    </aside>
+                </section>
 
-                    <div class="bk-stepper-wrap">
-                        <div class="bk-stepper">
-                            <button type="button" id="guest-minus" class="bk-step-btn" aria-label="Giảm số khách">−</button>
-                            <span class="bk-guest-value">
-                                <strong id="guest-value">2</strong>
-                                <span>khách</span>
-                            </span>
-                            <button type="button" id="guest-plus" class="bk-step-btn" aria-label="Tăng số khách">+</button>
+                <!-- ================= FORM ĐẶT BÀN ================= -->
+                <section class="booking-card" aria-labelledby="form-heading">
+                    <div class="booking-card-header">
+                        <div class="booking-card-title-wrap">
+                            <span class="card-step-badge">2</span>
+                            <div>
+                                <h2 id="form-heading" class="booking-card-title">Thông Tin Đặt Bàn</h2>
+                                <p class="booking-card-subtitle">
+                                    Chọn ngày, giờ, số khách và liên hệ để xác nhận đặt chỗ.
+                                </p>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="bk-guest-chips" id="guest-chips" role="group" aria-label="Chọn nhanh số khách">
-                        <button type="button" class="bk-chip" data-guests="1">1</button>
-                        <button type="button" class="bk-chip" data-guests="2">2</button>
-                        <button type="button" class="bk-chip" data-guests="4">4</button>
-                        <button type="button" class="bk-chip" data-guests="6">6</button>
-                        <button type="button" class="bk-chip" data-guests="8">8</button>
-                        <button type="button" class="bk-chip" data-guests="10">10</button>
-                    </div>
-                </fieldset>
-
-                <!-- Contact -->
-                <fieldset class="bk-group">
-                    <legend class="bk-legend">Thông tin liên hệ</legend>
-
-                    <div class="bk-grid-2">
-                        <label class="bk-field" id="field-name">
-                            <span>Họ và tên *</span>
-                            <input type="text" id="customer-name" autocomplete="name" placeholder="Nguyễn Văn A"
-                                maxlength="80" required>
-                        </label>
-
-                        <label class="bk-field" id="field-phone">
-                            <span>Số điện thoại *</span>
-                            <input type="tel" id="customer-phone" autocomplete="tel" placeholder="0901 234 567"
-                                maxlength="20" required>
-                        </label>
+                    <!-- Ngày -->
+                    <div class="form-group">
+                        <label for="book-date-input" class="bk-label">Ngày dùng bữa</label>
+                        <div class="date-quick-chips">
+                            <button type="button" class="quick-chip-btn" data-offset="0">Hôm nay</button>
+                            <button type="button" class="quick-chip-btn" data-offset="1">Ngày mai</button>
+                            <button type="button" class="quick-chip-btn" data-offset="2">Ngày kia</button>
+                            <button type="button" class="quick-chip-btn" data-offset="5">Cuối tuần này</button>
+                        </div>
+                        <input type="date" id="book-date-input" class="branch-search-input">
                     </div>
 
-                    <label class="bk-field" id="field-note">
-                        <span>
-                            Ghi chú đặc biệt
-                            <small class="bk-char-count" id="note-count">0/300</small>
-                        </span>
-                        <textarea id="customer-note" maxlength="300" rows="3"
-                            placeholder="Dị ứng thực phẩm, dịp kỷ niệm, yêu cầu chỗ ngồi..."></textarea>
-                    </label>
+                    <!-- Giờ -->
+                    <div class="form-group" style="margin-top: 20px;">
+                        <label class="bk-label">Khung giờ nhận bàn</label>
+                        <div class="session-group-title">Bữa trưa (11:00 — 14:00)</div>
+                        <div class="time-slots-grid">
+                            <button type="button" class="time-slot-btn" data-time="11:00">11:00</button>
+                            <button type="button" class="time-slot-btn" data-time="11:30">11:30</button>
+                            <button type="button" class="time-slot-btn" data-time="12:00">12:00</button>
+                            <button type="button" class="time-slot-btn" data-time="12:30">12:30</button>
+                            <button type="button" class="time-slot-btn" data-time="13:00">13:00</button>
+                            <button type="button" class="time-slot-btn" data-time="13:30">13:30</button>
+                        </div>
+                        <div class="session-group-title" style="margin-top: 24px;">Bữa tối (17:30 — 21:30)</div>
+                        <div class="time-slots-grid">
+                            <button type="button" class="time-slot-btn" data-time="17:30">17:30</button>
+                            <button type="button" class="time-slot-btn" data-time="18:00">18:00</button>
+                            <button type="button" class="time-slot-btn" data-time="18:30">18:30</button>
+                            <button type="button" class="time-slot-btn" data-time="19:00">19:00</button>
+                            <button type="button" class="time-slot-btn" data-time="19:30">19:30</button>
+                            <button type="button" class="time-slot-btn" data-time="20:00">20:00</button>
+                            <button type="button" class="time-slot-btn" data-time="20:30">20:30</button>
+                            <button type="button" class="time-slot-btn" data-time="21:00">21:00</button>
+                        </div>
+                    </div>
 
-                    <div class="bk-guest-chips" id="note-chips" role="group" aria-label="Gợi ý ghi chú">
-                        <button type="button" class="bk-chip" data-note="Dị ứng hải sản">Dị ứng hải sản</button>
-                        <button type="button" class="bk-chip" data-note="Dị ứng đậu phộng">Dị ứng đậu phộng</button>
-                        <button type="button" class="bk-chip" data-note="Kỷ niệm ngày cưới">Kỷ niệm ngày cưới</button>
-                        <button type="button" class="bk-chip" data-note="Sinh nhật">Sinh nhật</button>
-                        <button type="button" class="bk-chip" data-note="Có trẻ em đi cùng">Có trẻ em</button>
-                        <button type="button" class="bk-chip" data-note="Cần ghế cho em bé">Ghế em bé</button>
+                    <!-- Số lượng khách -->
+                    <div class="form-group" style="margin-top: 24px;">
+                        <label class="bk-label">Số lượng khách</label>
+                        <div class="guest-picker-box">
+                            <div class="guest-info-text">
+                                <h4>Số lượng khách tham dự</h4>
+                            </div>
+                            <div class="counter-controls">
+                                <button type="button" id="btn-guest-minus" class="btn-counter" aria-label="Giảm số khách">-</button>
+                                <span id="guest-counter-val" class="counter-display">2</span>
+                                <button type="button" id="btn-guest-plus" class="btn-counter" aria-label="Tăng số khách">+</button>
+                            </div>
+                        </div>
+                        <div class="guest-quick-pills">
+                            <button type="button" class="guest-pill-btn" data-guests="1">1 người</button>
+                            <button type="button" class="guest-pill-btn" data-guests="2">2 người</button>
+                            <button type="button" class="guest-pill-btn" data-guests="4">4 người</button>
+                            <button type="button" class="guest-pill-btn" data-guests="6">6 người</button>
+                            <button type="button" class="guest-pill-btn" data-guests="8">8 người</button>
+                            <button type="button" class="guest-pill-btn" data-guests="10">10+ người</button>
+                        </div>
                     </div>
-                </fieldset>
 
-                <!-- Summary -->
-                <div class="bk-summary" aria-label="Tóm tắt đặt bàn">
-                    <div class="bk-summary-row">
-                        <span>Chi nhánh</span>
-                        <strong id="sum-branch" class="is-empty">Chưa chọn chi nhánh</strong>
+                    <!-- Thông tin liên hệ -->
+                    <div class="booking-inputs-row">
+                        <div class="form-group">
+                            <label class="bk-label">Họ và tên</label>
+                            <input type="text" id="book-cust-name" class="branch-search-input"
+                                placeholder="Nguyễn Văn A" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="bk-label">Số điện thoại</label>
+                            <input type="tel" id="book-cust-phone" class="branch-search-input"
+                                placeholder="0901 234 567" required>
+                        </div>
                     </div>
-                    <div class="bk-summary-row">
-                        <span>Bàn đã chọn</span>
-                        <strong id="sum-table" class="is-empty">Chưa chọn bàn</strong>
+
+                    <!-- Chi nhánh đã chọn (hiển thị từ bản đồ) -->
+                    <div class="form-group" style="margin-top: 16px;">
+                        <label class="bk-label">Chi nhánh đã chọn</label>
+                        <div style="display:flex; align-items:center; gap:10px; background:var(--accent-warm-soft); border:1px solid var(--line); border-radius:var(--radius-md); padding:10px 14px;">
+                            <span class="bk-selected-icon" aria-hidden="true">🏢</span>
+                            <strong id="sum-branch" style="color:var(--accent-warm-deep);">Chưa chọn</strong>
+                            <span id="sum-branch-dist" style="font-size:0.85rem; color:var(--muted); margin-left:auto;"></span>
+                        </div>
                     </div>
-                    <div class="bk-summary-row">
-                        <span>Thời gian</span>
-                        <strong id="sum-time" class="is-empty">Chưa chọn giờ</strong>
-                    </div>
-                    <div class="bk-summary-row">
-                        <span>Số khách</span>
-                        <strong id="sum-guests">2 khách</strong>
+
+                    <!-- Nút xác nhận -->
+                    <button type="button" id="btn-submit-booking" class="btn-confirm-booking"
+                        style="margin-top: 24px; width: 100%;">
+                        <span>XÁC NHẬN ĐẶT BÀN</span>
+                        <span aria-hidden="true">→</span>
+                    </button>
+                </section>
+
+                <!-- ================= TICKET MODAL ================= -->
+                <div id="ticket-modal" class="ticket-overlay" hidden role="dialog" aria-modal="true"
+                    aria-labelledby="ticket-title">
+                    <div class="ticket-modal-card">
+                        <div class="ticket-header-band">
+                            <div class="ticket-icon-check">✓</div>
+                            <h2 id="ticket-title">Đặt Bàn Thành Công!</h2>
+                            <p>Yêu cầu giữ chỗ của bạn đã được gửi tới nhà hàng</p>
+                        </div>
+                        <div class="ticket-body">
+                            <div class="ticket-code-pill">
+                                <span class="ticket-code-label">MÃ ĐẶT CHỖ:</span>
+                                <span id="ticket-res-code" class="ticket-code-val">#TR-000000</span>
+                            </div>
+                            <div class="ticket-details-grid">
+                                <div>
+                                    <div class="ticket-field-label">Chi nhánh:</div>
+                                    <div id="ticket-res-restaurant" class="ticket-field-val">—</div>
+                                </div>
+                                <div>
+                                    <div class="ticket-field-label">Thời gian:</div>
+                                    <div id="ticket-res-datetime" class="ticket-field-val">—</div>
+                                </div>
+                                <div>
+                                    <div class="ticket-field-label">Số khách:</div>
+                                    <div id="ticket-res-guests" class="ticket-field-val">—</div>
+                                </div>
+                                <div style="grid-column: 1 / -1;">
+                                    <div class="ticket-field-label">Địa chỉ:</div>
+                                    <div id="ticket-res-address" class="ticket-field-val" style="font-size:0.9rem;">—</div>
+                                </div>
+                                <div style="grid-column: 1 / -1;">
+                                    <div class="ticket-field-label">Người đặt:</div>
+                                    <div id="ticket-res-customer" class="ticket-field-val">—</div>
+                                </div>
+                            </div>
+                            <div class="ticket-note-box">
+                                <strong>Lưu ý:</strong> Trạng thái đặt bàn hiện là
+                                <span class="status-badge pending" style="padding:2px 8px; font-size:0.75rem;">CHỜ XÁC NHẬN</span>.
+                                Nhà hàng sẽ liên hệ hoặc duyệt qua hệ thống. Vui lòng đến trước 10 phút để nhận bàn chu đáo nhất.
+                            </div>
+                            <div class="ticket-actions-row">
+                                <a href="history.html" class="btn-ticket-primary">Xem trong Lịch sử đặt bàn</a>
+                                <a href="dashboard.html" class="btn-ticket-ghost">Về Bảng điều khiển</a>
+                                <button type="button" id="btn-close-ticket" class="btn-ticket-ghost"
+                                    style="border:none; color:var(--muted); font-size:0.85rem;">Đóng thông báo này</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
-
-                <button type="submit" id="btn-confirm" class="bk-confirm">
-                    <span class="bk-confirm-label" id="confirm-label">Xác nhận đặt bàn</span>
-                    <span class="bk-confirm-arrow" aria-hidden="true">→</span>
-                    <span class="bk-confirm-spinner" aria-hidden="true"></span>
-                </button>
-
-                <p class="bk-terms">
-                    Bằng việc xác nhận, bạn đồng ý với quy định giữ bàn và chính sách hủy trước 24 giờ.
-                </p>
-            </form>
-
-            <!-- ---------- RIGHT: TABLE MAP ---------- -->
-            <section class="bk-panel bk-map-panel" aria-labelledby="table-map-title">
-                <div class="bk-panel-head">
-                    <div>
-                        <span class="bk-step">02</span>
-                        <h2 id="table-map-title">Sơ đồ bàn ăn</h2>
-                    </div>
-                    <div class="bk-legend" aria-label="Chú thích trạng thái bàn">
-                        <span><i class="bk-dot available"></i>Trống</span>
-                        <span><i class="bk-dot selected"></i>Đang chọn</span>
-                        <span><i class="bk-dot booked"></i>Đã đặt</span>
-                    </div>
-                </div>
-
-                <div class="bk-zone-tabs" role="tablist" aria-label="Khu vực bàn">
-                    <button type="button" class="bk-zone-tab is-active" data-zone="main" role="tab"
-                        aria-selected="true">Tầng trệt</button>
-                    <button type="button" class="bk-zone-tab" data-zone="garden" role="tab"
-                        aria-selected="false">Sân vườn</button>
-                    <button type="button" class="bk-zone-tab" data-zone="vip" role="tab"
-                        aria-selected="false">Phòng VIP</button>
-                </div>
-
-                <div class="bk-map">
-                    <div class="bk-map-stage" id="table-stage" role="group" aria-label="Sơ đồ bàn ăn">
-                        <!-- Bàn được render bởi booking.js -->
-                    </div>
-                    <div class="bk-table-tooltip" id="table-tooltip" hidden></div>
-                </div>
-
-                <div class="bk-map-footer">
-                    <span id="map-status" role="status" aria-live="polite">Đang tải sơ đồ bàn...</span>
-                    <button type="button" id="btn-reset-table" class="bk-link-btn" disabled>Bỏ chọn bàn</button>
-                </div>
-
-                <div class="bk-selected-card" id="selected-card" hidden>
-                    <div class="bk-selected-icon" aria-hidden="true">🪑</div>
-                    <div>
-                        <span>Bàn đang chọn</span>
-                        <strong id="selected-table-label">—</strong>
-                    </div>
-                    <button type="button" id="btn-clear-table" class="bk-selected-clear"
-                        aria-label="Bỏ chọn bàn">&times;</button>
-                </div>
-
-                <p class="bk-map-note">
-                    💡 Bàn trống được tô xanh, bàn bạn chọn chuyển màu đồng. Bàn xám đã có khách —
-                    hãy chọn khung giờ khác nếu cần.
-                </p>
-            </section>
+            </main>
         </div>
     </div>
 
-    <!-- ================= SUCCESS MODAL ================= -->
-    <div class="bk-modal" id="success-modal" hidden>
-        <div class="bk-modal-backdrop" data-close-modal></div>
-        <div class="bk-modal-card" role="dialog" aria-modal="true" aria-labelledby="success-title">
-            <button type="button" class="bk-modal-close" data-close-modal aria-label="Đóng">&times;</button>
+    <div id="toast-host" style="position:fixed; right:20px; bottom:20px; z-index:50; display:flex; flex-direction:column; gap:8px;"></div>
 
-            <svg class="bk-check" viewBox="0 0 52 52" aria-hidden="true">
-                <circle cx="26" cy="26" r="24"></circle>
-                <path d="M15 27l7 7 15-16"></path>
-            </svg>
-
-            <h2 id="success-title">Đã giữ bàn cho bạn!</h2>
-            <p id="modal-status">Yêu cầu đặt bàn đã được ghi nhận. Nhà hàng sẽ sớm xác nhận qua số điện thoại của bạn.</p>
-
-            <div class="bk-ticket">
-                <div class="bk-ticket-code">
-                    <span>Mã đặt bàn</span>
-                    <strong id="modal-code">#TR-000000</strong>
-                </div>
-                <div>
-                    <span>Chi nhánh</span>
-                    <strong id="modal-branch">—</strong>
-                </div>
-                <div>
-                    <span>Thời gian</span>
-                    <strong id="modal-time">—</strong>
-                </div>
-                <div>
-                    <span>Bàn</span>
-                    <strong id="modal-table">—</strong>
-                </div>
-                <div>
-                    <span>Số khách</span>
-                    <strong id="modal-guests">—</strong>
-                </div>
-                <div>
-                    <span>Người đặt</span>
-                    <strong id="modal-name">—</strong>
-                </div>
-            </div>
-
-            <p class="bk-modal-note" id="modal-note">
-                <strong>Lưu ý:</strong> vui lòng đến trước giờ hẹn 10 phút. Bạn có thể hủy miễn phí
-                trước 24 giờ trong mục Lịch sử đặt bàn.
-            </p>
-
-            <div class="bk-modal-actions">
-                <a href="history.html" class="bk-btn-primary">Xem lịch sử đặt bàn</a>
-                <button type="button" class="bk-btn-ghost" data-close-modal>Đóng</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ================= TOASTS ================= -->
-    <div class="bk-toasts" id="bk-toasts" aria-live="polite" aria-atomic="false"></div>
-
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Core JS -->
     <script src="../js/auth.js"></script>
     <script src="../js/api.js"></script>
     <script src="../js/book.js"></script>

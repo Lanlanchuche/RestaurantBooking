@@ -28,6 +28,12 @@
     --gold: var(--accent-warm-soft);
     --gold-soft: var(--accent-warm-softest);
 
+    /* Alias tương thích ngược (orange* → accent-warm*) cho HTML cũ */
+    --orange: var(--accent-warm);
+    --orange-deep: var(--accent-warm-deep);
+    --orange-soft: var(--accent-warm-soft);
+    --orange-light: var(--accent-warm-soft);
+
     /* Token dùng chung toàn giao diện */
     --tr-bg: var(--cream);
     --tr-surface: var(--paper);
@@ -3824,140 +3830,6 @@ body {
     background: var(--tr-success-soft);
 }
 
-.top5-rank-badge {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    background: var(--accent-warm-deep);
-    color: var(--tr-on-accent);
-    font-size: 0.74rem;
-    font-weight: 700;
-    width: 24px;
-    height: 24px;
-    border-radius: var(--radius-full);
-    display: grid;
-    place-items: center;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
-    z-index: 2;
-}
-
-.top5-thumb-wrap {
-    width: 88px;
-    height: 88px;
-    border-radius: 12px;
-    overflow: hidden;
-    flex-shrink: 0;
-    position: relative;
-}
-
-.top5-thumb {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.top5-info {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-}
-
-.top5-name {
-    font-family: Fraunces, Georgia, serif;
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--ink);
-    margin: 0 0 3px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.top5-cuisine {
-    font-size: 0.76rem;
-    color: var(--accent-warm);
-    font-weight: 700;
-    text-transform: uppercase;
-    margin-bottom: 5px;
-}
-
-.top5-meta-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.8rem;
-    color: var(--muted);
-    margin-bottom: 6px;
-}
-
-.top5-dist-pill {
-    background: rgba(15, 23, 42, 0.1);
-    color: var(--accent-warm-deep);
-    font-weight: 700;
-    padding: 2px 7px;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    gap: 3px;
-}
-
-.top5-rating {
-    color: #d97706;
-    font-weight: 700;
-}
-
-.top5-addr {
-    font-size: 0.8rem;
-    color: var(--muted);
-    line-height: 1.35;
-    margin-bottom: 8px;
-    display: -webkit-box;
-    -webkit-line-clamp: 1;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-}
-
-.top5-action-row {
-    margin-top: auto;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-}
-
-.top5-tables {
-    font-size: 0.78rem;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-}
-
-.btn-select-branch {
-    padding: 6px 14px;
-    border-radius: var(--radius-full);
-    font-size: 0.82rem;
-    font-weight: 700;
-    border: 1.5px solid var(--accent-warm);
-    background: #fff;
-    color: var(--accent-warm);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    white-space: nowrap;
-}
-
-.btn-select-branch:hover {
-    background: var(--accent-warm);
-    color: #fff;
-}
-
-.btn-select-branch.selected {
-    background: var(--tr-success);
-    border-color: var(--tr-success);
-    color: #fff;
-}
-
 /* Custom Leaflet Marker Pins */
 .custom-leaflet-marker {
     display: flex;
@@ -4214,15 +4086,9 @@ body {
     transform: translateY(-2px);
 }
 
-.top5-card-item.highlighted {
-    border-color: var(--accent-warm-soft);
-    box-shadow: 0 0 0 2px var(--accent-warm-soft), 0 8px 20px rgba(15, 23, 42, 0.2);
-    background: var(--accent-warm-soft);
-}
-
 .top5-card-item.selected {
     border-color: var(--accent-warm);
-    box-shadow: 0 0 0 2px var(--accent-warm), 0 8px 24px rgba(15, 23, 42, 0.18);
+    box-shadow: 0 0 0 2px var(--accent-warm), 0 8px 24px rgba(146, 64, 14, 0.18);
     background: var(--accent-warm-soft);
 }
 
@@ -4237,7 +4103,7 @@ body {
     height: 26px;
     border-radius: var(--radius-full);
     background: var(--accent-warm);
-    color: var(--tr-on-accent);
+    color: #fff;
     font-family: Fraunces, Georgia, serif;
     font-size: 0.82rem;
     font-weight: 700;
@@ -4262,7 +4128,7 @@ body {
 
 .top5-card-name {
     font-family: Fraunces, Georgia, serif;
-    font-size: 1rem;
+    font-size: 1.02rem;
     font-weight: 700;
     color: var(--ink);
     margin: 0 0 3px;
@@ -4307,7 +4173,7 @@ body {
     gap: 4px;
     font-weight: 700;
     color: var(--accent-warm-deep);
-    background: rgba(15, 23, 42, 0.1);
+    background: rgba(146, 64, 14, 0.1);
     padding: 2px 8px;
     border-radius: var(--radius-full);
     font-size: 0.76rem;
@@ -4335,7 +4201,7 @@ body {
     font-weight: 700;
     border: 1.5px solid var(--accent-warm);
     background: var(--accent-warm);
-    color: var(--tr-on-accent);
+    color: #fff;
     cursor: pointer;
     transition: all 0.2s ease;
     display: inline-flex;
@@ -4348,7 +4214,7 @@ body {
     background: var(--accent-warm-deep);
     border-color: var(--accent-warm-deep);
     transform: translateY(-1px);
-    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.25);
+    box-shadow: 0 4px 10px rgba(146, 64, 14, 0.25);
 }
 
 .top5-card-item.selected .btn-select-branch {
@@ -4471,4 +4337,308 @@ body {
 
 .btn-popup-select-branch.is-selected {
     background: var(--tr-success);
+}
+
+/* ==========================================================================
+   MAP TOOLBAR & NEAREST BRANCHES (Book page)
+   ========================================================================== */
+.map-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--accent-warm-soft);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+    flex-wrap: wrap;
+}
+
+.map-btn-show-nearest {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--accent-warm);
+    background: var(--accent-warm);
+    color: #fff;
+    font-family: inherit;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.map-btn-show-nearest:hover {
+    background: var(--accent-warm-deep);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(146, 64, 14, 0.25);
+}
+
+.map-btn-show-nearest:active {
+    transform: translateY(-1px);
+}
+
+.map-status-text {
+    font-size: 0.88rem;
+    color: var(--muted);
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 140px;
+}
+
+.branch-map-container-wrap {
+    display: flex;
+    flex-direction: column;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    border: 1.5px solid var(--line);
+    box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
+    background: #fff;
+    min-height: 560px;
+}
+
+.booking-leaflet-map {
+    width: 100%;
+    height: 420px;
+    z-index: 1;
+    background: #f1f5f9;
+}
+
+.map-controls-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: var(--accent-warm-soft);
+    border-top: 1px solid var(--line);
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    font-size: 0.86rem;
+    color: var(--muted);
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+/* ==========================================================================
+   ADDRESS FIELD ACTIONS (Book page - before branch selection)
+   ========================================================================== */
+.address-field-wrap {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.address-field-wrap textarea {
+    min-height: 96px;
+}
+
+.address-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.address-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--line);
+    background: var(--accent-warm-soft);
+    color: var(--accent-warm-deep);
+    font-family: inherit;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.address-btn:hover {
+    background: var(--accent-warm);
+    color: #fff;
+    border-color: var(--accent-warm);
+    transform: translateY(-1px);
+}
+
+.address-btn:active {
+    transform: translateY(-1px);
+}
+
+/* Responsive: stack address buttons on small screens */
+@media (max-width: 560px) {
+    .address-actions {
+        flex-direction: column;
+    }
+
+    .address-btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* ==========================================================================
+   BOOK PAGE EXTRA (label & layout tweaks)
+   ========================================================================== */
+.bk-label {
+    display: block;
+    margin-bottom: 7px;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--accent-warm-deep);
+}
+
+.dash-main > .booking-hero-header {
+    margin-bottom: 22px;
+}
+
+.branch-map-top5-layout {
+    gap: 24px;
+}
+
+.branch-map-container-wrap {
+    min-height: 560px;
+}
+
+.branch-top5-sidebar {
+    height: 560px;
+}
+
+.booking-card {
+    padding: 32px;
+}
+
+.booking-inputs-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 22px;
+}
+
+.btn-confirm-booking {
+    width: 100%;
+    padding: 16px 22px;
+    border-radius: var(--radius-full);
+    border: none;
+    background: linear-gradient(135deg, var(--accent-warm) 0%, var(--accent-warm-deep) 100%);
+    color: var(--tr-on-accent);
+    font-family: inherit;
+    font-size: 1.05rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    box-shadow: 0 12px 26px rgba(146, 64, 14, 0.32);
+    transition: all 0.25s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.btn-confirm-booking:hover:not(:disabled) {
+    transform: translateY(-3px);
+    box-shadow: 0 16px 32px rgba(146, 64, 14, 0.4);
+    filter: brightness(1.05);
+}
+
+.btn-confirm-booking:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Responsive for book page */
+@media (max-width: 992px) {
+    .branch-map-top5-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .branch-top5-sidebar {
+        height: auto;
+        max-height: 400px;
+    }
+}
+
+@media (max-width: 560px) {
+    .dash-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .dash-sidebar {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+
+    .dash-nav-btn {
+        flex: 1;
+        text-align: center;
+        white-space: nowrap;
+    }
+
+    .booking-inputs-row {
+        grid-template-columns: 1fr;
+    }
+
+    .branch-top5-sidebar {
+        height: auto;
+        max-height: 350px;
+    }
+}
+
+/* ==========================================================================
+   BOOK PAGE — TOP 5 EMPTY STATE & TOAST VARIANTS
+   ========================================================================== */
+.top5-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 36px 20px;
+    text-align: center;
+    border: 1.5px dashed var(--line);
+    border-radius: var(--radius-md);
+    background: var(--paper);
+}
+
+.top5-empty-icon {
+    font-size: 2rem;
+    line-height: 1;
+}
+
+.top5-empty-text {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--muted);
+}
+
+.top5-card-item.highlighted {
+    border-color: var(--accent-warm);
+    box-shadow: 0 0 0 2px var(--accent-warm-soft);
+}
+
+.toast-success {
+    background: #047857 !important;
+    color: #ecfdf5 !important;
+}
+
+.toast-danger {
+    background: #b91c1c !important;
+    color: #fef2f2 !important;
+}
+
+.toast-warning {
+    background: #b45309 !important;
+    color: #fffbeb !important;
+}
+
+.toast-info {
+    background: var(--ink) !important;
+    color: var(--paper) !important;
 }

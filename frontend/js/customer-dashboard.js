@@ -127,7 +127,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         const name = document.getElementById("profile-name").value.trim();
         const email = document.getElementById("profile-email").value.trim();
         const phone = document.getElementById("profile-phone").value.trim();
-        const address = document.getElementById("profile-address").value.trim();
         const currentUser = getUser() || user;
 
         if (!name) {
@@ -148,13 +147,13 @@ document.addEventListener("DOMContentLoaded", async () => {
             return;
         }
 
-        const payload = { name, email, phone, address };
+        const payload = { name, email, phone, address: document.getElementById("profile-address").value.trim() };
         saveBtn.disabled = true;
         setLoading(true, "Đang lưu thông tin cá nhân...");
 
         try {
             let updated = payload;
-            
+
             if (getToken() !== "demo-session-token") {
                 try {
                     updated = await api.put("/auth/me", payload);
@@ -170,6 +169,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             setAuthData(getToken(), nextUser);
             renderHeader(nextUser);
             fillProfileForm(nextUser);
+
             showProfileMessage("success", "Đã cập nhật thông tin cá nhân.");
             showToast("Đã lưu thông tin cá nhân.", "success");
         } catch (err) {

@@ -1,6 +1,6 @@
-// theme.js - Chuyển đổi giao diện sáng/tối, tono cam đồng nhất
+// theme.js - Chuyển đổi giao diện sáng/tối, tono be/trắng-đen + cam sẫm
 (function () {
-    const THEME_KEY = "selected-theme";
+    const THEME_KEY = "tr-theme";
     const html = document.documentElement;
     const toggleBtn = document.querySelector(".theme-toggle");
 
@@ -34,7 +34,7 @@
     }
 
     function toggleTheme() {
-        const isDark = html.hasAttribute("data-theme");
+        const isDark = html.getAttribute("data-theme") === "dark";
         applyTheme(isDark ? "light" : "dark");
     }
 

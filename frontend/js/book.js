@@ -11,6 +11,107 @@
 // Danh sách các chi nhánh (có thể load từ API)
 let currentBranches = [];
 
+/**
+ * Dữ liệu dự phòng — đồng bộ với 30 chi nhánh Hà Nội trong seed_hanoi.py.
+ * Chỉ dùng khi backend chưa chạy hoặc chưa seed dữ liệu, nhờ vậy bản đồ
+ * vẫn tìm được 5 chi nhánh gần nhất thay vì hiển thị dữ liệu giả.
+ */
+const HANOI_SEED_BRANCHES = [
+    { name: "Phở Thìn Lò Đúc", address: "13 Lò Đúc, Hai Bà Trưng, Hà Nội", lat: 21.0177, lng: 105.8569 },
+    { name: "Bún Chả Hương Liên", address: "24 Lê Văn Hưu, Hai Bà Trưng, Hà Nội", lat: 21.0169, lng: 105.8523 },
+    { name: "Chả Cá Lã Vọng", address: "14 Chả Cá, Hoàn Kiếm, Hà Nội", lat: 21.0347, lng: 105.8486 },
+    { name: "Quán Ăn Ngon", address: "18 Phan Bội Châu, Hoàn Kiếm, Hà Nội", lat: 21.0261, lng: 105.8427 },
+    { name: "Bún Ốc Bà Giao", address: "Ngõ 433 Bạch Mai, Hai Bà Trưng, Hà Nội", lat: 21.0028, lng: 105.8507 },
+    { name: "Phở Bát Đàn", address: "49 Bát Đàn, Hoàn Kiếm, Hà Nội", lat: 21.0315, lng: 105.8465 },
+    { name: "Kem Thủy Tạ", address: "1 Lý Thái Tổ, Hoàn Kiếm, Hà Nội", lat: 21.0313, lng: 105.8546 },
+    { name: "Pizza 4P's Tràng Tiền", address: "43 Tràng Tiền, Hoàn Kiếm, Hà Nội", lat: 21.0245, lng: 105.8540 },
+    { name: "Maison Sen Buffet", address: "61 Trần Hưng Đạo, Hoàn Kiếm, Hà Nội", lat: 21.0219, lng: 105.8475 },
+    { name: "Nhà Hàng Sen Tây Hồ", address: "614 Lạc Long Quân, Tây Hồ, Hà Nội", lat: 21.0743, lng: 105.8118 },
+    { name: "Bún Bò Huế O Xuân", address: "3 Quang Trung, Hoàn Kiếm, Hà Nội", lat: 21.0244, lng: 105.8488 },
+    { name: "Sushi Hokkaido Sachi", address: "Vincom Metropolis, Liễu Giai, Ba Đình, Hà Nội", lat: 21.0316, lng: 105.8152 },
+    { name: "Haidilao Vincom Center", address: "Vincom Center Phạm Ngọc Thạch, Đống Đa, Hà Nội", lat: 21.0069, lng: 105.8329 },
+    { name: "King BBQ Buffet", address: "Lotte Center, 54 Liễu Giai, Ba Đình, Hà Nội", lat: 21.0319, lng: 105.8122 },
+    { name: "Kichi Kichi", address: "101B Phạm Ngọc Thạch, Đống Đa, Hà Nội", lat: 21.0075, lng: 105.8321 },
+    { name: "Manwah Taiwanese Hotpot", address: "Thái Hà, Đống Đa, Hà Nội", lat: 21.0118, lng: 105.8213 },
+    { name: "Nhà hàng Ngon Garden", address: "70 Nguyễn Du, Hai Bà Trưng, Hà Nội", lat: 21.0194, lng: 105.8447 },
+    { name: "Trúc Lâm Trai (Chay)", address: "39 Lê Ngọc Hân, Hai Bà Trưng, Hà Nội", lat: 21.0152, lng: 105.8530 },
+    { name: "KFC Cầu Giấy", address: "292 Cầu Giấy, Quan Hoa, Cầu Giấy, Hà Nội", lat: 21.0340, lng: 105.7950 },
+    { name: "Highlands Coffee Cột Cờ", address: "28A Điện Biên Phủ, Ba Đình, Hà Nội", lat: 21.0322, lng: 105.8385 },
+    { name: "Cộng Cà Phê", address: "15 Trúc Bạch, Ba Đình, Hà Nội", lat: 21.0452, lng: 105.8378 },
+    { name: "Gogi House", address: "B4 Phạm Ngọc Thạch, Đống Đa, Hà Nội", lat: 21.0076, lng: 105.8335 },
+    { name: "Sumo BBQ", address: "Hoàng Quốc Việt, Cầu Giấy, Hà Nội", lat: 21.0461, lng: 105.7925 },
+    { name: "Lẩu Phan", address: "Giải Phóng, Hoàng Mai, Hà Nội", lat: 20.9852, lng: 105.8419 },
+    { name: "Bia Hơi Hải Xồm", address: "Hoàng Quốc Việt, Cầu Giấy, Hà Nội", lat: 21.0470, lng: 105.7950 },
+    { name: "Dookki Vietnam", address: "Vincom Trần Duy Hưng, Cầu Giấy, Hà Nội", lat: 21.0084, lng: 105.7936 },
+    { name: "Mcdonald's Hồ Gươm", address: "2 Hàng Bài, Hoàn Kiếm, Hà Nội", lat: 21.0249, lng: 105.8524 },
+    { name: "Starbucks Lan Viên", address: "32 Hàng Bài, Hoàn Kiếm, Hà Nội", lat: 21.0310, lng: 105.8517 },
+    { name: "Bánh Cuốn Gia Truyền", address: "14 Hàng Gà, Hoàn Kiếm, Hà Nội", lat: 21.0355, lng: 105.8466 },
+    { name: "Xôi Yến", address: "35B Nguyễn Hữu Huân, Hoàn Kiếm, Hà Nội", lat: 21.0326, lng: 105.8537 }
+];
+
+/**
+ * Chuẩn hoá 1 bản ghi chi nhánh từ backend / localStorage / dữ liệu seed
+ * về cùng một cấu trúc để phần còn lại của trang sử dụng thống nhất.
+ */
+function normalizeBranch(b, index = 0) {
+    const lat = Number(b.latitude != null ? b.latitude : b.lat);
+    const lng = Number(b.longitude != null ? b.longitude : b.lng);
+    const fallbackId = Number(b.id) || index + 1;
+    const fallbackRating = (4.3 + (fallbackId % 7) / 10).toFixed(1);
+    const totalTables = b.total_tables != null ? b.total_tables : 10 + (fallbackId % 40);
+    const availableTables = b.available_tables != null
+        ? b.available_tables
+        : Math.max(0, totalTables - (fallbackId % 7));
+
+    return {
+        id: b.id != null ? b.id : index + 1,
+        restaurantName: b.restaurant_name || b.name || "Chi nhánh",
+        name: b.name || b.restaurant_name || "Chi nhánh",
+        address: b.address || "",
+        cuisine: b.cuisine || "Ẩm thực Việt Nam",
+        rating: b.rating || fallbackRating,
+        reviewsCount: b.reviews_count || 0,
+        distanceKm: b.distance_km != null ? Number(b.distance_km) : null,
+        durationMin: b.duration_min != null ? Number(b.duration_min) : (b.estimated_time_minutes != null ? Number(b.estimated_time_minutes) : null),
+        totalTables,
+        availableTables,
+        lat,
+        lng,
+        image: b.image || ""
+    };
+}
+
+/**
+ * Khoảng cách đường chim bay giữa 2 toạ độ (km) — công thức Haversine.
+ */
+function haversineKm(lat1, lng1, lat2, lng2) {
+    const toRad = (deg) => (deg * Math.PI) / 180;
+    const R = 6371; // bán kính Trái Đất (km)
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+        Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+/**
+ * Tính khoảng cách + thời gian ước tính từ vị trí khách tới mọi chi nhánh.
+ */
+function computeBranchDistances(lat, lng) {
+    currentBranches.forEach((branch) => {
+        if (!Number.isFinite(branch.lat) || !Number.isFinite(branch.lng)) {
+            branch.distanceKm = null;
+            branch.durationMin = null;
+            return;
+        }
+        const km = haversineKm(lat, lng, branch.lat, branch.lng);
+        branch.distanceKm = Math.round(km * 100) / 100;
+        branch.durationMin = Math.max(1, Math.round((km / 30) * 60));
+    });
+}
+
 // Trạng thái đơn đặt chỗ hiện tại
 const bookingState = {
     selectedBranch: null,
@@ -25,6 +126,8 @@ const bookingState = {
 
 // Biến quản lý Leaflet Map
 let bookingMap = null;
+let branchLayer = null;
+let userMarker = null;
 const branchMarkers = new Map(); // id -> L.marker
 let activeHighlightedBranchId = null;
 
@@ -92,212 +195,211 @@ function initUserHeader(user) {
 }
 
 /**
- * Load danh sách chi nhánh từ API hoặc localStorage
+ * Load danh sách chi nhánh: ưu tiên API backend (dữ liệu thật đã seed),
+ * sau đó localStorage, cuối cùng là dữ liệu seed Hà Nội đóng gói sẵn.
  */
 async function loadBranchesData() {
+    // 1) API công khai của backend — trả về toàn bộ chi nhánh đang hoạt động
     try {
-        // Thử load từ backend API
-        const data = await api.get("/restaurant/me/branches");
+        const data = await api.get("/customer/branches");
         if (Array.isArray(data) && data.length > 0) {
-            loadedBranches = data.map((b) => ({
-                id: b.id,
-                restaurantName: b.restaurant_name || b.name,
-                name: b.name,
-                address: b.address,
-                cuisine: b.cuisine || "",
-                rating: b.rating || null,
-                reviewsCount: b.reviews_count || 0,
-                distanceKm: b.distance_km || 0,
-                durationMin: b.duration_min || 0,
-                totalTables: b.total_tables || 0,
-                availableTables: b.available_tables || 0,
-                lat: b.latitude,
-                lng: b.longitude,
-                image: b.image || ""
-            }));
+            currentBranches = data.map(normalizeBranch);
+            console.info(`[book] Đã tải ${currentBranches.length} chi nhánh từ backend.`);
             return;
         }
-    } catch {
-        // Backend offline, fallback localStorage
+    } catch (err) {
+        console.warn("[book] Không tải được /customer/branches:", err.message);
     }
-    // Fallback: tải từ localStorage (do branches.js lưu)
+
+    // 2) Fallback: dữ liệu do trang quản lý chi nhánh lưu trong localStorage
     try {
         const stored = localStorage.getItem("restaurant_branches");
         if (stored) {
             const parsed = JSON.parse(stored);
             if (Array.isArray(parsed) && parsed.length > 0) {
-                loadedBranches = parsed.map((b) => ({
-                    id: b.id,
-                    restaurantName: b.restaurant_name || b.name,
-                    name: b.name,
-                    address: b.address,
-                    cuisine: b.cuisine || "",
-                    rating: b.rating || null,
-                    reviewsCount: b.reviews_count || 0,
-                    distanceKm: b.distance_km || 0,
-                    durationMin: b.duration_min || 0,
-                    totalTables: b.total_tables || 0,
-                    availableTables: b.available_tables || 0,
-                    lat: b.latitude,
-                    lng: b.longitude,
-                    image: b.image || ""
-                }));
+                currentBranches = parsed.map(normalizeBranch);
+                console.info(`[book] Đã tải ${currentBranches.length} chi nhánh từ localStorage.`);
                 return;
             }
         }
     } catch {
         // Ignore
     }
-    loadedBranches = [];
+
+    // 3) Fallback cuối: dữ liệu seed Hà Nội (giống seed_hanoi.py)
+    currentBranches = HANOI_SEED_BRANCHES.map(normalizeBranch);
+    console.info(`[book] Backend offline — dùng ${currentBranches.length} chi nhánh seed Hà Nội.`);
 }
 
 /**
- * Lấy danh sách Top 5 nhà hàng gần nhất sắp xếp theo khoảng cách
+ * Lấy danh sách Top 5 nhà hàng gần nhất (sắp xếp theo khoảng cách đã tính).
  */
 function getTop5Branches() {
-    return [...currentBranches]
-        .sort((a, b) => a.distanceKm - b.distanceKm)
+    const candidates = currentBranches.filter(
+        (b) => Number.isFinite(b.lat) && Number.isFinite(b.lng)
+    );
+
+    if (bookingState.userLat != null && bookingState.userLng != null) {
+        candidates.forEach((b) => {
+            if (b.distanceKm == null) {
+                b.distanceKm = Math.round(
+                    haversineKm(bookingState.userLat, bookingState.userLng, b.lat, b.lng) * 100
+                ) / 100;
+            }
+        });
+    }
+
+    return candidates
+        .sort((a, b) => {
+            const da = a.distanceKm == null ? Number.POSITIVE_INFINITY : a.distanceKm;
+            const db = b.distanceKm == null ? Number.POSITIVE_INFINITY : b.distanceKm;
+            return da - db;
+        })
         .slice(0, 5);
 }
 
 /**
- * Khởi tạo Leaflet Map và các Markers
+ * Khởi tạo Leaflet Map (chỉ tạo 1 lần, không destroy để tránh lỗi
+ * "Map container is already initialized").
  */
 function initBookingMap() {
     const mapContainer = document.getElementById("booking-map");
     if (!mapContainer || typeof L === "undefined") {
-        console.warn("Leaflet library not ready or container not found.");
-        return;
+        console.warn("[book] Leaflet chưa sẵn sàng hoặc không tìm thấy #booking-map.");
+        return null;
     }
 
-    const top5 = getTop5Branches();
-    const defaultCenter = top5.length > 0
-        ? [top5[0].lat, top5[0].lng]
-        : [10.7769, 106.7009]; // TP. Hồ Chí Minh fallback
+    if (bookingMap) {
+        bookingMap.invalidateSize();
+        return bookingMap;
+    }
 
-    // Tạo bản đồ Leaflet
-    bookingMap = L.map("booking-map", {
+    // Trung tâm mặc định: Hà Nội (khu vực dữ liệu seed)
+    bookingMap = L.map(mapContainer, {
         scrollWheelZoom: true,
         zoomControl: true
-    }).setView(defaultCenter, 13);
+    }).setView([21.0285, 105.8542], 12);
 
-    // Sử dụng OpenStreetMap tile layer
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>'
     }).addTo(bookingMap);
 
-    // Tạo Marker cho từng chi nhánh trong Top 5
-    top5.forEach((branch, idx) => {
-        const isSelected = bookingState.selectedBranch?.id === branch.id;
+    branchLayer = L.layerGroup().addTo(bookingMap);
+
+    // Leaflet cần biết kích thước thật của container sau khi CSS/layout chạy xong
+    setTimeout(() => bookingMap && bookingMap.invalidateSize(), 200);
+    return bookingMap;
+}
+
+/**
+ * Vẽ marker vị trí khách hàng (nếu đã có toạ độ).
+ */
+function renderUserMarker() {
+    if (!bookingMap) return;
+    if (userMarker) {
+        userMarker.remove();
+        userMarker = null;
+    }
+    if (bookingState.userLat == null || bookingState.userLng == null) return;
+
+    userMarker = L.marker([bookingState.userLat, bookingState.userLng], {
+        icon: L.divIcon({
+            className: "custom-user-marker",
+            html: `<div style="background:#2e7d32; color:white; width:20px; height:20px; border-radius:50%; border:3px solid white; box-shadow:0 0 10px rgba(0,0,0,0.5);"></div>`,
+            iconSize: [26, 26],
+            iconAnchor: [13, 13]
+        })
+    }).bindPopup("<b>Vị trí của bạn</b>").addTo(bookingMap);
+}
+
+/**
+ * Vẽ lại marker cho danh sách chi nhánh truyền vào.
+ * @param {Array} branches Danh sách chi nhánh cần vẽ
+ * @param {boolean} numbered true = đánh số thứ tự (Top 5), false = chấm tròn
+ */
+function renderMapMarkers(branches, numbered = true) {
+    initBookingMap();
+    if (!bookingMap || !branchLayer) return;
+
+    branchLayer.clearLayers();
+    branchMarkers.clear();
+
+    (branches || []).forEach((branch, idx) => {
+        if (!Number.isFinite(branch.lat) || !Number.isFinite(branch.lng)) return;
+
+        const isSelected = bookingState.selectedBranch && bookingState.selectedBranch.id === branch.id;
         const pinIcon = L.divIcon({
             className: `custom-leaflet-marker ${isSelected ? "selected-pin" : ""}`,
             html: `
-                <div class="map-pin-inner" id="pin-branch-${branch.id}">
-                    <span class="map-pin-label">${idx + 1}</span>
+                <div class="map-pin-inner">
+                    <span class="map-pin-label">${numbered ? idx + 1 : "•"}</span>
                 </div>
             `,
-            iconSize: [38, 38],
-            iconAnchor: [19, 38],
+            iconSize: [40, 40],
+            iconAnchor: [20, 40],
             popupAnchor: [0, -38]
         });
 
-        const marker = L.marker([branch.lat, branch.lng], { icon: pinIcon }).addTo(bookingMap);
+        const marker = L.marker([branch.lat, branch.lng], { icon: pinIcon }).addTo(branchLayer);
 
-        // Nội dung popup khi click marker
-        const popupContent = `
+        const distanceText = branch.distanceKm != null
+            ? `Khoảng cách: <strong>${branch.distanceKm.toFixed(1)} km</strong>`
+            : "Khoảng cách: <em>chưa xác định</em>";
+
+        marker.bindPopup(`
             <div class="popup-branch-box">
                 <div class="top5-cuisine">${branch.cuisine}</div>
-                <h4 class="popup-branch-title">${branch.restaurantName}</h4>
+                <h4 class="popup-branch-title">${branch.name}</h4>
                 <div class="popup-branch-addr">${branch.address}</div>
                 <div class="popup-branch-meta">
-                    <span>Khoảng cách: <strong>${branch.distanceKm} km</strong></span>
+                    <span>${distanceText}</span>
                     <span class="top5-rating">★ ${branch.rating}</span>
                 </div>
                 <button type="button" class="btn-popup-select" id="btn-popup-pick-${branch.id}">
                     ${isSelected ? "✓ Đang chọn chi nhánh này" : "Chọn chi nhánh này"}
                 </button>
             </div>
-        `;
+        `);
 
-        marker.bindPopup(popupContent);
-
-        // Sự kiện click vào marker
-        marker.on("click", () => {
-            highlightBranch(branch.id, false);
-            // Gắn sự kiện nút trong popup sau khi popup mở
-            setTimeout(() => {
-                const btn = document.getElementById(`btn-popup-pick-${branch.id}`);
-                if (btn) {
-                    btn.onclick = () => selectBranch(branch);
-                }
-            }, 50);
-        });
-
+        marker.on("click", () => highlightBranch(branch.id, false));
         marker.on("popupopen", () => {
             const btn = document.getElementById(`btn-popup-pick-${branch.id}`);
-            if (btn) {
-                btn.onclick = () => selectBranch(branch);
-            }
+            if (btn) btn.onclick = () => selectBranch(branch);
         });
 
         branchMarkers.set(branch.id, marker);
     });
 
-    if (bookingState.userLat && bookingState.userLng) {
-        L.marker([bookingState.userLat, bookingState.userLng], {
-            icon: L.divIcon({
-                className: "custom-user-marker",
-                html: `<div style="background:#2e7d32; color:white; width:20px; height:20px; border-radius:50%; border:3px solid white; box-shadow:0 0 10px rgba(0,0,0,0.5);"></div>`,
-                iconSize: [26, 26],
-                iconAnchor: [13, 13]
-            })
-        }).bindPopup("<b>Vị trí của bạn</b>").addTo(bookingMap);
-        
-        // Căn bản đồ hiển thị được cả user và top 5 nếu có
-        const features = [L.marker([bookingState.userLat, bookingState.userLng])];
-        if (top5 && top5.length > 0) {
-            features.push(...top5.map(b => L.marker([b.lat, b.lng])));
-        }
-        const group = new L.featureGroup(features);
-        bookingMap.fitBounds(group.getBounds(), { padding: [50, 50], maxZoom: 14 });
-    }
-
-    // Nút Toàn cảnh (Recenter Map)
-    const recenterBtn = document.getElementById("btn-recenter-map");
-    if (recenterBtn) {
-        recenterBtn.addEventListener("click", () => {
-            fitAllBranchesOnMap();
-        });
-    }
-
-    // Sau khi render map xong, fit view để thấy toàn cảnh các marker
-    setTimeout(() => {
-        bookingMap.invalidateSize();
-        fitAllBranchesOnMap();
-    }, 200);
+    renderUserMarker();
 }
 
 /**
- * Đưa bản đồ về góc nhìn bao quát toàn bộ Top 5 chi nhánh
+ * Đưa bản đồ về góc nhìn bao quát toàn bộ chi nhánh đang hiển thị
+ * (mặc định là Top 5 gần nhất, nếu truyền vào thì dùng danh sách đó).
  */
-function fitAllBranchesOnMap() {
+function fitAllBranchesOnMap(branches) {
     if (!bookingMap) return;
-    const top5 = getTop5Branches();
-    
-    if (top5.length === 0) {
-        if (bookingState.userLat && bookingState.userLng) {
-            bookingMap.setView([bookingState.userLat, bookingState.userLng], 14);
-        }
-        return;
-    }
-    
-    const latLngs = top5.map((b) => [b.lat, b.lng]);
-    if (bookingState.userLat && bookingState.userLng) {
+
+    const list = (branches && branches.length ? branches : getTop5Branches())
+        .filter((b) => Number.isFinite(b.lat) && Number.isFinite(b.lng));
+
+    const latLngs = list.map((b) => [b.lat, b.lng]);
+    if (bookingState.userLat != null && bookingState.userLng != null) {
         latLngs.push([bookingState.userLat, bookingState.userLng]);
     }
-    const bounds = L.latLngBounds(latLngs);
-    bookingMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+
+    if (latLngs.length === 0) {
+        bookingMap.setView([21.0285, 105.8542], 12);
+        return;
+    }
+
+    if (latLngs.length === 1) {
+        bookingMap.setView(latLngs[0], 15);
+        return;
+    }
+
+    bookingMap.fitBounds(L.latLngBounds(latLngs), { padding: [40, 40], maxZoom: 14 });
 }
 
 /**
@@ -311,20 +413,19 @@ function highlightBranch(branchId, flyToMap = true) {
     if (!branch) return;
 
     // 1. Cập nhật giao diện trong danh sách thẻ Top 5
-    document.querySelectorAll(".top5-branch-card").forEach((card) => {
+    document.querySelectorAll(".top5-card-item").forEach((card) => {
         const id = parseInt(card.dataset.branchId, 10);
-        card.classList.toggle("active-map", id === branchId);
+        card.classList.toggle("highlighted", id === branchId);
     });
 
     // Cuộn thẻ tương ứng vào khung nhìn nếu chưa thấy
-    const targetCard = document.querySelector(`.top5-branch-card[data-branch-id="${branchId}"]`);
+    const targetCard = document.querySelector(`.top5-card-item[data-branch-id="${branchId}"]`);
     if (targetCard) {
         targetCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
 
     // 2. Cập nhật marker trên Leaflet Map
     branchMarkers.forEach((marker, id) => {
-        const pinEl = document.getElementById(`pin-branch-${id}`);
         const markerEl = marker.getElement();
         if (markerEl) {
             markerEl.classList.toggle("active-pin", id === branchId);
@@ -346,68 +447,67 @@ function highlightBranch(branchId, flyToMap = true) {
 }
 
 /**
- * Render danh sách Top 5 nhà hàng gần nhất ở cột bên phải
+ * Render danh sách Top 5 nhà hàng gần nhất ở cột bên phải.
+ * Markup khớp với CSS .top5-card-item trong style.css.
  */
 function renderTop5Branches(branchesList) {
     const container = document.getElementById("top-branches-list");
+    const countEl = document.getElementById("top5-count");
     if (!container) return;
 
     container.innerHTML = "";
+    if (countEl) countEl.textContent = branchesList ? branchesList.length : 0;
 
     if (!branchesList || branchesList.length === 0) {
         container.innerHTML = `
-            <div style="text-align: center; padding: 40px 20px; color: var(--muted); border: 1px dashed var(--line); border-radius: 8px;">
-                <span style="font-size: 2rem; display: block; margin-bottom: 12px;">📍</span>
-                <p style="margin: 0;">Vui lòng nhập địa chỉ hoặc ấn Lấy vị trí để tìm các nhà hàng gần bạn nhất.</p>
+            <div class="top5-empty-state">
+                <span class="top5-empty-icon">📍</span>
+                <p class="top5-empty-text">
+                    Nhập địa chỉ hoặc bấm <strong>Lấy vị trí hiện tại</strong>,
+                    sau đó bấm <strong>Hiển thị 5 chi nhánh gần nhất</strong>.
+                </p>
             </div>
         `;
         return;
     }
 
-    branchesList.forEach((branch, idx) => {
-        const isSelected = bookingState.selectedBranch?.id === branch.id;
-        const isHighlighted = activeHighlightedBranchId === branch.id;
+    branchesList.slice(0, 5).forEach((branch, idx) => {
+        const isSelected = bookingState.selectedBranch && bookingState.selectedBranch.id === branch.id;
+        const distanceText = branch.distanceKm != null
+            ? `📍 ${branch.distanceKm.toFixed(1)} km`
+            : "📍 ? km";
+        const durationText = branch.durationMin != null ? `~${branch.durationMin} phút` : "";
+        const tables = branch.availableTables != null && branch.availableTables > 0
+            ? `🪑 ${branch.availableTables} bàn trống`
+            : `🪑 ${branch.totalTables || 0} bàn`;
 
         const card = document.createElement("div");
-        card.className = `top5-branch-card ${isSelected ? "selected" : ""} ${isHighlighted ? "active-map" : ""}`;
+        card.className = `top5-card-item ${isSelected ? "selected" : ""}`;
         card.dataset.branchId = branch.id;
         card.setAttribute("role", "listitem");
-
-        let availClass = "green";
-        let availText = `Còn ${branch.availableTables} bàn`;
-        if (branch.availableTables <= 0) {
-            availClass = "red";
-            availText = "Hết bàn";
-        } else if (branch.availableTables <= 2) {
-            availClass = "orange";
-            availText = `Chỉ còn ${branch.availableTables} bàn`;
-        }
-
         card.innerHTML = `
-            <div class="top5-rank-badge">#${idx + 1}</div>
-            <div class="top5-info" style="padding: 12px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px;">
-                <div class="top5-cuisine">${branch.cuisine}</div>
-                <h4 class="top5-name" title="${branch.restaurantName}">${branch.restaurantName}</h4>
-                <div class="top5-meta-row">
-                    <span class="top5-dist-pill">${branch.distanceKm} km · ~${branch.durationMin}p</span>
-                    <span class="top5-rating">★ ${branch.rating} (${branch.reviewsCount})</span>
+            <div class="top5-card-header">
+                <div class="top5-rank-badge">${idx + 1}</div>
+                <div class="top5-card-thumb" style="display:grid;place-items:center;font-size:1.6rem;">🍽️</div>
+                <div class="top5-card-meta">
+                    <div class="top5-card-name" title="${branch.name}">${branch.name}</div>
+                    <div class="top5-card-cuisine">${branch.cuisine}</div>
+                    <div class="top5-card-rating">★ ${branch.rating}</div>
                 </div>
-                <div class="top5-addr" title="${branch.address}">${branch.address}</div>
-                <div class="top5-action-row" style="margin-top: 12px;">
-                    <div class="top5-tables">
-                        <span class="avail-dot ${availClass}"></span>
-                        <span>${availText}</span>
-                    </div>
-                    <button type="button" class="btn-select-branch ${isSelected ? "selected" : ""}" data-branch-id="${branch.id}">
-                        ${isSelected ? "✓ Đã chọn" : "Chọn chi nhánh"}
-                    </button>
-                </div>
+            </div>
+            <div class="top5-card-details">
+                <div class="top5-card-distance">${distanceText}${durationText ? " · " + durationText : ""}</div>
+                <div class="top5-card-tables">${tables}</div>
+            </div>
+            <div class="top5-card-actions">
+                <button type="button" class="btn-select-branch" data-branch-id="${branch.id}">
+                    ${isSelected ? "✓ Đã chọn" : "Chọn chi nhánh"}
+                </button>
             </div>
         `;
 
-        // Sự kiện click vào thẻ: Làm nổi bật vị trí trên bản đồ Leaflet
+        // Click vào thẻ: bay tới marker; click nút: chọn chi nhánh
         card.addEventListener("click", (e) => {
-            // Nếu bấm vào nút "Chọn chi nhánh"
             if (e.target.closest(".btn-select-branch")) {
                 selectBranch(branch);
                 return;
@@ -423,11 +523,11 @@ function renderTop5Branches(branchesList) {
  * Chọn chi nhánh để đặt bàn
  */
 function selectBranch(branch) {
+    if (!branch) return;
     bookingState.selectedBranch = branch;
 
     // Cập nhật giao diện danh sách
-    const top5 = getTop5Branches();
-    renderTop5Branches(top5);
+    renderTop5Branches(getTop5Branches());
 
     // Cập nhật marker styles trên bản đồ
     branchMarkers.forEach((marker, id) => {
@@ -435,7 +535,6 @@ function selectBranch(branch) {
         if (markerEl) {
             markerEl.classList.toggle("selected-pin", id === branch.id);
         }
-        // Cập nhật nội dung popup
         if (id === branch.id && marker.isPopupOpen()) {
             const btn = document.getElementById(`btn-popup-pick-${id}`);
             if (btn) {
@@ -450,11 +549,11 @@ function selectBranch(branch) {
     // Cập nhật tóm tắt thông tin đặt bàn
     updateSummary();
 
-    showToast(`Đã chọn chi nhánh: ${branch.restaurantName}`, "success", 2400);
+    showToast(`Đã chọn chi nhánh: ${branch.name}`, "success", 2400);
 
-    // Scroll mượt đến bước tiếp theo trên thiết bị di động
+    // Scroll mượt đến phần nhập ngày/giờ trên thiết bị di động
     if (window.innerWidth < 768) {
-        document.getElementById("section-datetime")?.scrollIntoView({ behavior: "smooth" });
+        document.getElementById("form-heading")?.scrollIntoView({ behavior: "smooth" });
     }
 }
 
@@ -628,42 +727,24 @@ function initGuestPicker() {
  * Các dòng thời gian, số khách ẩn mặc định — chỉ hiện khi khách hàng chọn giá trị
  */
 function updateSummary() {
-    // 1. Chi nhánh
-    const branchNameEl = document.getElementById("sum-branch-name");
-    const branchAddrEl = document.getElementById("sum-branch-addr");
-    const branchImgEl = document.getElementById("sum-branch-img");
+    const branch = bookingState.selectedBranch;
+    const nameEl = document.getElementById("sum-branch");
+    const distEl = document.getElementById("sum-branch-dist");
+    const infoEl = document.getElementById("map-selected-info");
 
-    if (bookingState.selectedBranch) {
-        if (branchNameEl) branchNameEl.textContent = bookingState.selectedBranch.restaurantName;
-        if (branchAddrEl) branchAddrEl.textContent = bookingState.selectedBranch.address;
-    } else {
-        if (branchNameEl) branchNameEl.textContent = "Chưa chọn chi nhánh";
-        if (branchAddrEl) branchAddrEl.textContent = "Vui lòng chọn 1 nhà hàng bên cạnh";
-    }
-
-    // 2. Thời gian — chỉ hiện khi khách đã chọn CẢ ngày VÀ giờ, nếu thiếu thì để trống
-    const timeRow = document.getElementById("sum-datetime-row");
-    const timeEl = document.getElementById("sum-datetime-val");
-    if (timeRow && timeEl) {
-        if (bookingState._dateTouched && bookingState.date && bookingState._timeTouched && bookingState.time) {
-            timeEl.textContent = `${bookingState.time} • ${formatDateVi(bookingState.date)}`;
-            timeRow.hidden = false;
+    if (nameEl) nameEl.textContent = branch ? branch.name : "Chưa chọn";
+    if (distEl) {
+        if (branch && branch.distanceKm != null) {
+            const duration = branch.durationMin != null ? ` · ~${branch.durationMin} phút` : "";
+            distEl.textContent = `${branch.distanceKm.toFixed(1)} km${duration}`;
         } else {
-            timeEl.textContent = "";
-            timeRow.hidden = true;
+            distEl.textContent = "";
         }
     }
-
-    // 3. Số khách — chỉ hiện khi khách đã tương tác chọn số lượng
-    const guestRow = document.getElementById("sum-guest-row");
-    const guestEl = document.getElementById("sum-guest-val");
-    if (guestRow && guestEl) {
-        if (bookingState._guestTouched) {
-            guestEl.textContent = `${bookingState.guestCount} Khách`;
-            guestRow.hidden = false;
-        } else {
-            guestRow.hidden = true;
-        }
+    if (infoEl) {
+        infoEl.textContent = branch
+            ? `Đã chọn: ${branch.name}`
+            : "Chưa chọn chi nhánh nào";
     }
 }
 
@@ -674,13 +755,18 @@ function showConfirmationTicket(resData) {
     const modal = document.getElementById("ticket-modal");
     if (!modal) return;
 
-    document.getElementById("ticket-res-code").textContent = resData.id || ("#TR-" + Math.floor(100000 + Math.random() * 900000));
-    document.getElementById("ticket-res-restaurant").textContent = resData.restaurant_name || resData.branch_name;
-    document.getElementById("ticket-res-address").textContent = resData.branch_address;
-    document.getElementById("ticket-res-datetime").textContent = `${resData.reservation_time}`;
-    document.getElementById("ticket-res-guests").textContent = `${resData.guest_count} khách`;
-    document.getElementById("ticket-res-table").textContent = `Bàn số ${resData.table_number || "Sắp xếp khi đến"}`;
-    document.getElementById("ticket-res-customer").textContent = `${resData.customer_name} • ${resData.customer_phone}`;
+    const setText = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value;
+    };
+
+    setText("ticket-res-code", resData.id || ("#TR-" + Math.floor(100000 + Math.random() * 900000)));
+    setText("ticket-res-restaurant", resData.restaurant_name || resData.branch_name || "—");
+    setText("ticket-res-address", resData.branch_address || "—");
+    setText("ticket-res-datetime", resData.reservation_time || "—");
+    setText("ticket-res-guests", `${resData.guest_count || 0} khách`);
+    setText("ticket-res-customer", `${resData.customer_name || ""} • ${resData.customer_phone || ""}`);
+    setText("ticket-res-table", `Bàn số ${resData.table_number || "Sắp xếp khi đến"}`);
 
     modal.hidden = false;
 }
@@ -692,12 +778,17 @@ async function handleBookingSubmit() {
     // Validation
     if (!bookingState.selectedBranch) {
         showToast("Vui lòng chọn một chi nhánh nhà hàng.", "danger");
-        document.getElementById("section-branch")?.scrollIntoView({ behavior: "smooth" });
+        document.getElementById("booking-map")?.scrollIntoView({ behavior: "smooth" });
         return;
     }
 
     if (!bookingState.date) {
         showToast("Vui lòng chọn ngày dùng bữa.", "danger");
+        return;
+    }
+
+    if (!bookingState.time) {
+        showToast("Vui lòng chọn khung giờ nhận bàn.", "danger");
         return;
     }
 
@@ -804,200 +895,271 @@ async function handleBookingSubmit() {
 
 // Khởi chạy khi tài liệu sẵn sàng
 document.addEventListener("DOMContentLoaded", async () => {
-    // 1. Kiểm tra xác thực (tự động tạo phiên demo nếu cần)
+    // 1. Kiểm tra xác thực
     const user = requireAuth("CUSTOMER");
     if (!user) return;
 
     // 2. Khởi tạo header
     initUserHeader(user);
 
-    // 3. Load danh sách chi nhánh từ API / localStorage
+    // 3. Load danh sách chi nhánh thật từ backend / localStorage / seed
     await loadBranchesData();
 
-    // 4. Khởi tạo Top 5 chi nhánh và mặc định chọn chi nhánh đầu tiên
-    const top5 = getTop5Branches();
-    if (top5.length > 0) {
-        bookingState.selectedBranch = top5[0];
-        activeHighlightedBranchId = top5[0].id;
-    } else {
-        bookingState.selectedBranch = null;
-        activeHighlightedBranchId = null;
-    }
-    renderTop5Branches(top5);
-
-    // 5. Khởi tạo Leaflet Map
+    // 4. Khởi tạo bản đồ và hiển thị toàn bộ chi nhánh hiện có
     initBookingMap();
+    renderMapMarkers(currentBranches, false);
+    fitAllBranchesOnMap(currentBranches);
+    setMapStatus("Nhập địa chỉ hoặc lấy vị trí hiện tại để tìm 5 chi nhánh gần nhất");
 
-    // 6. Khởi tạo chọn ngày giờ và số khách
-    initDateTimeSection();
-    initGuestPicker();
+    // Danh sách Top 5 để trống kèm hướng dẫn cho tới khi có vị trí
+    renderTop5Branches([]);
     updateSummary();
 
-    // 7.5 Các tính năng tìm kiếm vị trí
-    const userLocInput = document.getElementById("user-location-input");
-    
-    // Nút xác nhận địa chỉ nhập tay
-    const btnConfirmAddress = document.getElementById("btn-confirm-address");
-    if (btnConfirmAddress && userLocInput) {
-        btnConfirmAddress.addEventListener("click", async () => {
-            const address = userLocInput.value.trim();
-            if (!address) {
-                showToast("Vui lòng nhập địa chỉ.", "danger");
-                return;
-            }
-            
-            setLoading(true, "Đang tìm vị trí địa chỉ...");
-            try {
-                // Geocoding bằng Nominatim (OpenStreetMap)
-                const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`);
-                const data = await res.json();
-                
-                if (data && data.length > 0) {
-                    const lat = parseFloat(data[0].lat);
-                    const lng = parseFloat(data[0].lon);
-                    
-                    bookingState.userLat = lat;
-                    bookingState.userLng = lng;
-                    
-                    // Gọi API Dijkstra tìm nhà hàng gần nhất
-                    const branchRes = await api.get(`/customer/branches/nearby?lat=${lat}&lng=${lng}&limit=5`);
-                    if (branchRes && branchRes.length > 0) {
-                        currentBranches = branchRes.map((item, index) => ({
-                            id: item.id,
-                            restaurantName: item.name,
-                            name: item.name,
-                            address: item.address,
-                            cuisine: "Món ăn đa dạng",
-                            rating: 4.8,
-                            reviewsCount: Math.floor(Math.random() * 500) + 50,
-                            distanceKm: item.distance_km,
-                            durationMin: item.estimated_time_minutes,
-                            totalTables: item.total_tables,
-                            availableTables: item.available_tables,
-                            lat: item.latitude,
-                            lng: item.longitude
-                        }));
-                        
-                        bookingState.selectedBranch = currentBranches[0];
-                        activeHighlightedBranchId = currentBranches[0].id;
-                        
-                        renderTop5Branches(currentBranches);
-                        branchMarkers.forEach((marker) => marker.remove());
-                        branchMarkers.clear();
-                        
-                        // Nếu map tồn tại, remove nó để khởi tạo lại
-                        if (bookingMap) {
-                            bookingMap.remove();
-                            bookingMap = null;
-                        }
-                        initBookingMap();
-                        updateSummary();
-                        
-                        showToast("Đã tìm thấy nhà hàng gần địa chỉ này!", "success");
-                    } else {
-                        showToast("Không tìm thấy nhà hàng nào gần đây.", "warning");
-                    }
-                } else {
-                    showToast("Không thể nhận diện địa chỉ này, vui lòng nhập rõ hơn.", "danger");
-                }
-            } catch (err) {
-                showToast("Lỗi khi tra cứu địa chỉ.", "danger");
-            } finally {
-                setLoading(false);
-            }
-        });
+    // 5. Khởi tạo chọn ngày giờ và số khách
+    initDateTimeSection();
+    initGuestPicker();
+
+    // 6. Nút lấy địa chỉ + tìm 5 chi nhánh gần nhất
+    initAddressTools(user);
+
+    /* ============================================================
+     * Địa chỉ & tìm 5 chi nhánh gần nhất
+     * ============================================================ */
+
+    function setMapStatus(text) {
+        const el = document.getElementById("map-status");
+        if (el) el.textContent = text;
     }
 
-    // Lấy vị trí GPS hiện tại và API Dijkstra
-    const btnGetLocation = document.getElementById("btn-get-location");
-    if (btnGetLocation && userLocInput) {
-        btnGetLocation.addEventListener("click", () => {
-            if (navigator.geolocation) {
-                setLoading(true, "Đang định vị và tìm đường đi (Dijkstra)...");
+    function findBranchByText(text) {
+        const term = String(text || "").toLowerCase().trim();
+        if (!term) return null;
+        const shortTerm = term.split(",")[0].trim();
+
+        return currentBranches.find((b) => {
+            const name = b.name.toLowerCase();
+            const address = b.address.toLowerCase();
+            return (
+                name.includes(term) ||
+                address.includes(term) ||
+                term.includes(name) ||
+                (shortTerm.length >= 3 && (name.includes(shortTerm) || address.includes(shortTerm)))
+            );
+        }) || null;
+    }
+
+    async function geocodeAddress(address) {
+        // 1) Nominatim (OpenStreetMap)
+        try {
+            const url = "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=vn&q=" +
+                encodeURIComponent(address);
+            const res = await fetch(url, { headers: { Accept: "application/json" } });
+            if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data) && data.length > 0) {
+                    return {
+                        lat: parseFloat(data[0].lat),
+                        lng: parseFloat(data[0].lon),
+                        label: data[0].display_name || address
+                    };
+                }
+            }
+        } catch {
+            // thử provider dự phòng bên dưới
+        }
+
+        // 2) Photon (Komoot) — dự phòng khi Nominatim bị chặn/giới hạn
+        try {
+            const res = await fetch(
+                "https://photon.komoot.io/api/?limit=1&q=" + encodeURIComponent(address),
+                { headers: { Accept: "application/json" } }
+            );
+            if (res.ok) {
+                const data = await res.json();
+                const feature = data && data.features && data.features[0];
+                if (feature && feature.geometry && Array.isArray(feature.geometry.coordinates)) {
+                    return {
+                        lat: Number(feature.geometry.coordinates[1]),
+                        lng: Number(feature.geometry.coordinates[0]),
+                        label: address
+                    };
+                }
+            }
+        } catch {
+            // rơi xuống lỗi chung
+        }
+
+        throw new Error("Không tìm thấy địa chỉ này. Hãy nhập rõ hơn (VD: 13 Lò Đúc, Hà Nội).");
+    }
+
+    /**
+     * Tính khoảng cách từ (lat,lng) tới toàn bộ chi nhánh, vẽ Top 5 lên bản đồ
+     * và render danh sách bên phải.
+     */
+    async function showNearestBranches(lat, lng, label) {
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+            throw new Error("Toạ độ không hợp lệ.");
+        }
+        if (!currentBranches.length) await loadBranchesData();
+
+        bookingState.userLat = lat;
+        bookingState.userLng = lng;
+        computeBranchDistances(lat, lng);
+
+        const top5 = getTop5Branches();
+        if (!top5.length) {
+            showToast("Không có chi nhánh nào trong hệ thống.", "danger");
+            return [];
+        }
+
+        renderTop5Branches(top5);
+        renderMapMarkers(top5, true); // 5 marker đánh số 1..5
+        fitAllBranchesOnMap(top5);
+        setMapStatus(`Đã tìm thấy ${top5.length} chi nhánh gần ${label}`);
+        showToast(`Đã hiển thị ${top5.length} chi nhánh gần nhất trên bản đồ.`, "success");
+        return top5;
+    }
+
+    /** Địa chỉ -> toạ độ (Nominatim), fallback khớp tên chi nhánh có sẵn. */
+    async function resolveAddress(address) {
+        // Người dùng có thể đã bấm "Lấy vị trí hiện tại" → ô địa chỉ chứa toạ độ
+        const coordMatch = String(address).match(/(-?\d{1,2}[.,]\d+)\s*[,;]\s*(-?\d{1,3}[.,]\d+)/);
+        if (coordMatch) {
+            const lat = parseFloat(coordMatch[1].replace(",", "."));
+            const lng = parseFloat(coordMatch[2].replace(",", "."));
+            if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+                return { lat, lng, label: "toạ độ đã nhập" };
+            }
+        }
+
+        try {
+            return await geocodeAddress(address);
+        } catch (err) {
+            const local = findBranchByText(address);
+            if (local) {
+                return { lat: local.lat, lng: local.lng, label: local.name };
+            }
+            throw err;
+        }
+    }
+
+    /** Hàm dùng chung cho các nút (và có thể gọi từ ngoài). */
+    window.findNearestBranches = async function (input = {}) {
+        setLoading(true, "Đang tìm 5 chi nhánh gần nhất...");
+        try {
+            if (input.lat != null && input.lng != null) {
+                return await showNearestBranches(Number(input.lat), Number(input.lng), "vị trí của bạn");
+            }
+            if (input.address) {
+                const point = await resolveAddress(input.address);
+                return await showNearestBranches(point.lat, point.lng, input.address);
+            }
+            throw new Error("Chưa có địa chỉ hoặc toạ độ.");
+        } catch (err) {
+            showToast(err.message || "Không thể tìm chi nhánh gần nhất.", "danger");
+            setMapStatus(err.message || "Không tìm được chi nhánh gần nhất");
+            return [];
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    /**
+     * Gắn sự kiện cho ô địa chỉ và 3 nút: lấy vị trí / địa chỉ mặc định / tìm chi nhánh.
+     */
+    function initAddressTools(user) {
+        const addressInput = document.getElementById("book-address");
+        const btnGet = document.getElementById("btn-get-location");
+        const btnDefault = document.getElementById("btn-default-address");
+        const btnShow = document.getElementById("btn-show-nearest");
+
+        const savedAddress =
+            (user && user.address ? String(user.address).trim() : "") ||
+            localStorage.getItem("tr-default-address") || "";
+
+        if (addressInput) {
+            if (savedAddress && !addressInput.value) addressInput.value = savedAddress;
+            addressInput.addEventListener("change", () => {
+                const val = addressInput.value.trim();
+                if (val) {
+                    localStorage.setItem("tr-default-address", val);
+                    setMapStatus("Đã lưu địa chỉ mặc định.");
+                }
+            });
+            addressInput.addEventListener("keydown", (e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    if (btnShow) btnShow.click();
+                }
+            });
+        }
+
+        /* 📍 Lấy vị trí hiện tại */
+        if (btnGet) {
+            btnGet.addEventListener("click", () => {
+                if (!navigator.geolocation) {
+                    showToast("Trình duyệt không hỗ trợ định vị.", "danger");
+                    return;
+                }
+                const originalText = btnGet.textContent;
+                btnGet.disabled = true;
+                btnGet.textContent = "📍 Đang xác định...";
+                setMapStatus("Đang lấy vị trí hiện tại...");
+
                 navigator.geolocation.getCurrentPosition(
                     async (position) => {
                         const lat = position.coords.latitude;
                         const lng = position.coords.longitude;
-                        userLocInput.value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-                        bookingState.userLat = lat;
-                        bookingState.userLng = lng;
-                        
-                        try {
-                            // Gọi API tìm nhà hàng gần nhất bằng Dijkstra
-                            const res = await api.get(`/customer/branches/nearby?lat=${lat}&lng=${lng}&limit=5`);
-                            if (res && res.length > 0) {
-                                // Cập nhật danh sách currentBranches
-                                currentBranches = res.map((item, index) => ({
-                                    id: item.id,
-                                    restaurantName: item.name,
-                                    name: item.name,
-                                    address: item.address,
-                                    cuisine: "Món ăn đa dạng", // Backend chưa có trường này
-                                    rating: 4.8,
-                                    reviewsCount: Math.floor(Math.random() * 500) + 50,
-                                    distanceKm: item.distance_km,
-                                    durationMin: item.estimated_time_minutes,
-                                    totalTables: item.total_tables,
-                                    availableTables: item.available_tables,
-                                    lat: item.latitude,
-                                    lng: item.longitude
-                                }));
-                                
-                                // Chọn nhánh gần nhất
-                                bookingState.selectedBranch = currentBranches[0];
-                                activeHighlightedBranchId = currentBranches[0].id;
-                                
-                                // Render lại UI
-                                renderTop5Branches(currentBranches);
-                                
-                                // Xóa các marker cũ trên bản đồ
-                                branchMarkers.forEach((marker) => marker.remove());
-                                branchMarkers.clear();
-                                
-                                // Nếu map tồn tại, remove nó để khởi tạo lại
-                                if (bookingMap) {
-                                    bookingMap.remove();
-                                    bookingMap = null;
-                                }
-                                
-                                // Khởi tạo lại map marker
-                                initBookingMap();
-                                updateSummary();
-                                
-                                showToast("Đã tìm thấy các nhà hàng gần nhất qua Dijkstra!", "success");
-                            }
-                        } catch (err) {
-                            showToast("Lỗi khi tìm nhà hàng gần nhất từ server.", "danger");
-                        } finally {
-                            setLoading(false);
+                        if (addressInput) {
+                            addressInput.value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
                         }
+                        await window.findNearestBranches({ lat, lng });
+                        btnGet.disabled = false;
+                        btnGet.textContent = originalText;
                     },
                     (error) => {
-                        setLoading(false);
-                        showToast("Không thể lấy vị trí. Vui lòng bật GPS hoặc nhập tay.", "danger");
-                    }
+                        btnGet.disabled = false;
+                        btnGet.textContent = originalText;
+                        const reason = error && error.code === 1
+                            ? "Bạn chưa cho phép truy cập vị trí."
+                            : "Không lấy được vị trí hiện tại.";
+                        showToast(`${reason} Vui lòng nhập địa chỉ thủ công.`, "danger");
+                        setMapStatus("Không lấy được vị trí — hãy nhập địa chỉ thủ công");
+                    },
+                    { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
                 );
-            } else {
-                showToast("Trình duyệt không hỗ trợ Geolocation.", "danger");
-            }
-        });
-    }
+            });
+        }
 
-    // Dùng địa chỉ mặc định
-    const btnDefaultLocation = document.getElementById("btn-default-location");
-    if (btnDefaultLocation && userLocInput) {
-        btnDefaultLocation.addEventListener("click", () => {
-            if (!user || !user.address || user.address.trim() === "") {
-                showToast("Bạn chưa cập nhật địa chỉ ở phần Thông tin cá nhân. Vui lòng cập nhật trước hoặc tự nhập tay.", "danger");
-            } else {
-                userLocInput.value = user.address;
-                const btnConfirm = document.getElementById("btn-confirm-address");
-                if (btnConfirm) {
-                    btnConfirm.click(); // Trigger geocoding and API call
+        /* 🏠 Địa chỉ mặc định */
+        if (btnDefault) {
+            btnDefault.addEventListener("click", () => {
+                const saved = localStorage.getItem("tr-default-address") ||
+                    (user && user.address ? String(user.address).trim() : "");
+                if (!saved) {
+                    showToast("Chưa có địa chỉ mặc định. Hãy nhập địa chỉ rồi thử lại.", "danger");
+                    if (addressInput) addressInput.focus();
+                    return;
                 }
-                showToast("Đang tìm nhà hàng gần địa chỉ mặc định...", "success");
-            }
-        });
+                if (addressInput) addressInput.value = saved;
+                window.findNearestBranches({ address: saved });
+            });
+        }
+
+        /* 🔍 Hiển thị 5 chi nhánh gần nhất */
+        if (btnShow) {
+            btnShow.addEventListener("click", () => {
+                const address = addressInput ? addressInput.value.trim() : "";
+                if (!address) {
+                    showToast("Vui lòng nhập địa chỉ hoặc bấm Lấy vị trí hiện tại trước.", "danger");
+                    if (addressInput) addressInput.focus();
+                    return;
+                }
+                localStorage.setItem("tr-default-address", address);
+                setMapStatus("Đang tìm 5 chi nhánh gần nhất...");
+                window.findNearestBranches({ address });
+            });
+        }
     }
 
     // 7.6 Nút Đặt bàn (Xác nhận)

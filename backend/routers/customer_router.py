@@ -54,6 +54,29 @@ def _get_customer(
 
 
 @router.get(
+    "/branches",
+    response_model=list[schemas.BranchResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def list_active_branches(
+    db: Session = Depends(get_db),
+) -> list[models.Branch]:
+    """Danh sách toàn bộ chi nhánh đang hoạt động (dùng cho trang đặt bàn).
+
+    Endpoint công khai, không yêu cầu đăng nhập: khách hàng cần dữ liệu
+    chi nhánh thật (toạ độ, địa chỉ, số bàn) để tự tính 5 chi nhánh gần
+    nhất theo vị trí/địa chỉ của mình.
+    """
+
+    return (
+        db.query(models.Branch)
+        .filter(models.Branch.is_active.is_(True))
+        .order_by(models.Branch.id)
+        .all()
+    )
+
+
+@router.get(
     "/branches/nearby",
     response_model=list[schemas.NearbyBranchResponse],
     status_code=status.HTTP_200_OK,
