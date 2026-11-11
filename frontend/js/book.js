@@ -749,6 +749,18 @@ function updateSummary() {
 }
 
 /**
+ * Định dạng mã đặt chỗ hiển thị: số id từ backend -> "#TR-000012",
+ * chuỗi dự phòng "TR-123456" -> "#TR-123456".
+ */
+function formatReservationCode(id) {
+    if (typeof id === "number") {
+        return `#TR-${String(id).padStart(6, "0")}`;
+    }
+    if (id) return `#${String(id).replace(/^#/, "")}`;
+    return "#TR-" + Math.floor(100000 + Math.random() * 900000);
+}
+
+/**
  * Hiển thị vé đặt chỗ thành công (Ticket Modal)
  */
 function showConfirmationTicket(resData) {
@@ -760,15 +772,34 @@ function showConfirmationTicket(resData) {
         if (el) el.textContent = value;
     };
 
-    setText("ticket-res-code", resData.id || ("#TR-" + Math.floor(100000 + Math.random() * 900000)));
+    setText("ticket-res-code", formatReservationCode(resData.id));
     setText("ticket-res-restaurant", resData.restaurant_name || resData.branch_name || "—");
     setText("ticket-res-address", resData.branch_address || "—");
     setText("ticket-res-datetime", resData.reservation_time || "—");
     setText("ticket-res-guests", `${resData.guest_count || 0} khách`);
     setText("ticket-res-customer", `${resData.customer_name || ""} • ${resData.customer_phone || ""}`);
-    setText("ticket-res-table", `Bàn số ${resData.table_number || "Sắp xếp khi đến"}`);
+    setText("ticket-res-table", resData.table_number
+        ? `Bàn số ${resData.table_number}`
+        : "Sẽ được sắp xếp khi bạn đến nhà hàng");
+
+    // Cập nhật badge trạng thái theo kết quả trả về (mặc định PENDING)
+    const statusEl = document.getElementById("ticket-res-status");
+    if (statusEl) {
+        const statusMap = {
+            PENDING: ["pending", "CHỜ XÁC NHẬN"],
+            CONFIRMED: ["confirmed", "ĐÃ XÁC NHẬN"],
+            REJECTED: ["rejected", "TỪ CHỐI"],
+            CANCELLED: ["cancelled", "ĐÃ HUỶ"]
+        };
+        const [cls, label] = statusMap[resData.status] || statusMap.PENDING;
+        statusEl.className = `status-badge ${cls}`;
+        statusEl.textContent = label;
+    }
 
     modal.hidden = false;
+    // Ghi lại thời điểm vé vừa hiện — dùng để chặn cú click/tap "đúp" còn sót
+    // từ nút Xác nhận rơi trúng nút Đóng ngay sau khi vé mở ra.
+    modal.dataset.openedAt = String(Date.now());
 }
 
 /**
@@ -825,6 +856,7 @@ async function handleBookingSubmit() {
 
     try {
         let resultReservation = null;
+        let usedDemoMode = false;
 
         // Gửi tới backend API
         try {
@@ -840,15 +872,24 @@ async function handleBookingSubmit() {
                 reservation_time: `${bookingState.time} • ${formatDateVi(bookingState.date)}`,
                 raw_time: apiRes.reservation_time,
                 guest_count: apiRes.guest_count,
-                table_number: apiRes.table_number || Math.floor(1 + Math.random() * 12),
+                // Backend chỉ gán số bàn khi chủ quán xác nhận -> giữ null để vé ghi
+                // "Sẽ được sắp xếp khi bạn đến nhà hàng" thay vì bịa số bàn ngẫu nhiên
+                table_number: apiRes.table_number ?? null,
                 customer_name: apiRes.customer?.full_name || custName,
                 customer_phone: apiRes.customer?.phone || custPhone,
                 status: apiRes.status,
                 created_at: apiRes.created_at
             };
         } catch (err) {
-            console.error("API error, using local fallback", err);
-            // Backend offline hoặc chưa có API -> Demo mode lưu vào localStorage
+            // Backend trả lỗi nghiệp vụ thật (400 giờ quá khứ, 409 hết bàn, 404...)
+            // -> Ném lên để hiện đúng nguyên nhân, KHÔNG mở vé thành công giả.
+            if (!err.isNetworkError) {
+                throw err;
+            }
+
+            // Backend offline hoàn toàn -> Demo mode lưu vào localStorage
+            usedDemoMode = true;
+            console.warn("Backend offline, using local demo mode", err);
             const randCode = "TR-" + Math.floor(100000 + Math.random() * 900000);
             resultReservation = {
                 id: randCode,
@@ -867,13 +908,17 @@ async function handleBookingSubmit() {
             };
         }
 
-        // Lưu đơn đặt chỗ vào lịch sử local
-        try {
-            const savedList = JSON.parse(localStorage.getItem("customer_reservations") || "[]");
-            savedList.unshift(resultReservation);
-            localStorage.setItem("customer_reservations", JSON.stringify(savedList));
-        } catch (e) {
-            console.warn("Could not save to localStorage", e);
+        // Chỉ đơn demo (backend offline) mới lưu localStorage.
+        // Đơn thành công qua API đã nằm trong DB backend và lịch sử sẽ đọc từ API,
+        // tránh hai nguồn dữ liệu lệch nhau.
+        if (usedDemoMode) {
+            try {
+                const savedList = JSON.parse(localStorage.getItem("customer_reservations") || "[]");
+                savedList.unshift(resultReservation);
+                localStorage.setItem("customer_reservations", JSON.stringify(savedList));
+            } catch (e) {
+                console.warn("Could not save to localStorage", e);
+            }
         }
 
         // Cập nhật số bàn trống của chi nhánh vừa đặt
@@ -882,7 +927,12 @@ async function handleBookingSubmit() {
             renderTop5Branches(getTop5Branches());
         }
 
-        showToast("Đặt bàn thành công! Mã đặt chỗ của bạn đã sẵn sàng.", "success");
+        showToast(
+            usedDemoMode
+                ? "Đặt bàn (chế độ offline): đơn chỉ lưu trên trình duyệt vì backend đang không kết nối."
+                : "Đặt bàn thành công! Mã đặt chỗ của bạn đã sẵn sàng.",
+            usedDemoMode ? "warning" : "success"
+        );
         showConfirmationTicket(resultReservation);
 
     } catch (err) {
@@ -936,7 +986,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (!term) return null;
         const shortTerm = term.split(",")[0].trim();
 
-        return currentBranches.find((b) => {
+        const exact = currentBranches.find((b) => {
             const name = b.name.toLowerCase();
             const address = b.address.toLowerCase();
             return (
@@ -945,48 +995,144 @@ document.addEventListener("DOMContentLoaded", async () => {
                 term.includes(name) ||
                 (shortTerm.length >= 3 && (name.includes(shortTerm) || address.includes(shortTerm)))
             );
-        }) || null;
+        });
+        if (exact) return exact;
+
+        // Khớp mờ theo từ khóa: tách địa chỉ thành các cụm (đường, quận, phường)
+        // rồi tìm chi nhánh chia sẻ nhiều cụm nhất — VD "Cầu Giấy" trong
+        // "292 Cầu Giấy, Quan Hoa, Cầu Giấy, Hà Nội".
+        const IGNORE = new Set([" hà nội ", " hà nôi ", " việt nam ", " số ", " đường ", " phố ", " phường ", " quận ", " huyện ", " thành phố "]);
+        const tokens = term
+            .split(/[,;]+/)
+            .map((p) => ` ${p.trim()} `)
+            .filter((p) => !IGNORE.has(p) && p.trim().length >= 3);
+        if (!tokens.length) return null;
+
+        let best = null;
+        let bestScore = 0;
+        currentBranches.forEach((b) => {
+            const haystack = ` ${b.name.toLowerCase()} ${b.address.toLowerCase()} `;
+            const score = tokens.filter((t) => haystack.includes(t)).length;
+            if (score > bestScore) {
+                bestScore = score;
+                best = b;
+            }
+        });
+        return bestScore > 0 ? best : null;
+    }
+
+    /**
+     * Chuẩn hoá địa chỉ tiếng Việt trước khi geocode.
+     * Nominatim/Photon rất khó khớp khi chuỗi chứa các tiền từ hành chính
+     * ("Số 298 đường Cầu Diễn, phường Tây Tựu, quận Bắc Từ Liêm..."),
+     * nhưng khớp tốt với dạng gọn "298 Cầu Diễn, Bắc Từ Liêm, Hà Nội".
+     */
+    function normalizeVietnameseAddress(address) {
+        let s = String(address || "").trim();
+        // Dùng lookaround Unicode (\p{L}) vì \b của JS không nhận ký tự tiếng Việt (đ, à...)
+        // Cụm đa từ phải bỏ TRƯỚC để không bị tách rời ("thành phố" -> "thành").
+        s = s.replace(/(?<![\p{L}\p{N}])thành phố(?=\s|$)/giu, " ");
+        s = s.replace(/(?<![\p{L}\p{N}])số(?=\s*\d)/giu, " ");
+        s = s.replace(/(?<![\p{L}\p{N}])đường(?=\s)/giu, " ");
+        s = s.replace(/(?<![\p{L}\p{N}])phố(?=\s+[A-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚÝ])/giu, " ");
+        s = s.replace(/(?<![\p{L}\p{N}])phường(?=\s)/giu, " ");
+        s = s.replace(/(?<![\p{L}\p{N}])quận(?=\s)/giu, " ");
+        s = s.replace(/(?<![\p{L}\p{N}])huyện(?=\s)/giu, " ");
+        s = s.replace(/(?<![\p{L}\p{N}])xã(?=\s)/giu, " ");
+        s = s.replace(/(?<![\p{L}\p{N}])thị trấn(?=\s|$)/giu, " ");
+        // Viết tắt có dấu chấm: "P. Tây Tựu", "Q. Bắc Từ Liêm", "TP. Hà Nội"
+        s = s.replace(/(?<![\p{L}\p{N}])tp\.(?=\s|$)/giu, " ");
+        s = s.replace(/(?<![\p{L}\p{N}])[pqt]\.(?=\s|$)/giu, " ");
+        s = s.replace(/\s*,\s*/g, ", ").replace(/\s{2,}/g, " ").trim();
+        return s;
+    }
+
+    /**
+     * Tạo các biến thể truy giảm dần độ cụ thể, VD:
+     * "Số 298 đường Cầu Diễn, phường Tây Tựu, quận Bắc Từ Liêm, thành phố Hà Nội"
+     *   → "298 Cầu Diễn, Bắc Từ Liêm, Hà Nội"
+     *   → "Cầu Diễn, Bắc Từ Liêm, Hà Nội"
+     *   → "Cầu Diễn, Hà Nội"
+     */
+    function buildAddressCandidates(address) {
+        const normalized = normalizeVietnameseAddress(address);
+        const parts = normalized.split(",").map((p) => p.trim()).filter(Boolean);
+
+        const housePart = parts[0] || "";
+        const hasHouseNumber = /^\d+/.test(housePart);
+        const tail = parts.slice(1).filter((p) => !/^(việt nam|vietnam)$/i.test(p));
+
+        // Luôn thử nguyên văn địa chỉ người dùng nhập trước, rồi tới các bản chuẩn hoá
+        const candidates = [String(address || "").trim(), normalized];
+        if (hasHouseNumber && tail.length) {
+            // Bỏ dần các cụm trung gian (phường...), giữ số nhà + quận + thành phố
+            candidates.push([housePart, ...tail.slice(1)].join(", "));
+            // Chỉ số nhà + thành phố cuối
+            candidates.push([housePart, tail[tail.length - 1]].join(", "));
+        }
+        if (parts.length > 1) {
+            // Không có số nhà: lấy tên đường + thành phố
+            const street = hasHouseNumber ? housePart.replace(/^\d+\s*/, "") : housePart;
+            candidates.push([street, tail[tail.length - 1] || "Hà Nội"].join(", "));
+        }
+        // Loại trùng lặp và các chuỗi rỗng
+        return [...new Set(candidates.filter((c) => c && c.replace(/[,.\s]/g, "").length > 2))];
+    }
+
+    async function queryNominatim(query) {
+        const url = "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=vn&q=" +
+            encodeURIComponent(query);
+        const res = await fetch(url, { headers: { Accept: "application/json" } });
+        if (!res.ok) return null;
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+            return {
+                lat: parseFloat(data[0].lat),
+                lng: parseFloat(data[0].lon),
+                label: data[0].display_name || query
+            };
+        }
+        return null;
+    }
+
+    async function queryPhoton(query) {
+        const res = await fetch(
+            "https://photon.komoot.io/api/?limit=1&q=" + encodeURIComponent(query),
+            { headers: { Accept: "application/json" } }
+        );
+        if (!res.ok) return null;
+        const data = await res.json();
+        const feature = data && data.features && data.features[0];
+        if (feature && feature.geometry && Array.isArray(feature.geometry.coordinates)) {
+            const name = feature.properties &&
+                [feature.properties.name, feature.properties.district, feature.properties.city]
+                    .filter(Boolean).join(", ");
+            return {
+                lat: Number(feature.geometry.coordinates[1]),
+                lng: Number(feature.geometry.coordinates[0]),
+                label: name || query
+            };
+        }
+        return null;
     }
 
     async function geocodeAddress(address) {
-        // 1) Nominatim (OpenStreetMap)
-        try {
-            const url = "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=vn&q=" +
-                encodeURIComponent(address);
-            const res = await fetch(url, { headers: { Accept: "application/json" } });
-            if (res.ok) {
-                const data = await res.json();
-                if (Array.isArray(data) && data.length > 0) {
-                    return {
-                        lat: parseFloat(data[0].lat),
-                        lng: parseFloat(data[0].lon),
-                        label: data[0].display_name || address
-                    };
-                }
-            }
-        } catch {
-            // thử provider dự phòng bên dưới
-        }
+        const candidates = buildAddressCandidates(address);
 
-        // 2) Photon (Komoot) — dự phòng khi Nominatim bị chặn/giới hạn
-        try {
-            const res = await fetch(
-                "https://photon.komoot.io/api/?limit=1&q=" + encodeURIComponent(address),
-                { headers: { Accept: "application/json" } }
-            );
-            if (res.ok) {
-                const data = await res.json();
-                const feature = data && data.features && data.features[0];
-                if (feature && feature.geometry && Array.isArray(feature.geometry.coordinates)) {
-                    return {
-                        lat: Number(feature.geometry.coordinates[1]),
-                        lng: Number(feature.geometry.coordinates[0]),
-                        label: address
-                    };
-                }
+        // Thử lần lượt từng biến thể địa chỉ trên 2 provider
+        for (const q of candidates) {
+            try {
+                const hit = await queryNominatim(q);
+                if (hit) return hit;
+            } catch {
+                // Nominatim lỗi mạng/quá giới hạn → thử provider dự phòng
             }
-        } catch {
-            // rơi xuống lỗi chung
+            try {
+                const hit = await queryPhoton(q);
+                if (hit) return hit;
+            } catch {
+                // tiếp tục biến thể kế tiếp
+            }
         }
 
         throw new Error("Không tìm thấy địa chỉ này. Hãy nhập rõ hơn (VD: 13 Lò Đúc, Hà Nội).");
@@ -1174,12 +1320,21 @@ document.addEventListener("DOMContentLoaded", async () => {
         logoutBtn.addEventListener("click", logout);
     }
 
-    // 10. Đóng modal xác nhận
+    // 10. Đóng modal vé xác nhận — CHỈ đóng khi người dùng chủ động bấm nút Đóng.
+    // (Modal không có timer tự tắt; overlay nền cũng không bấm-để-đóng.)
     const closeModalBtn = document.getElementById("btn-close-ticket");
     if (closeModalBtn) {
-        closeModalBtn.addEventListener("click", () => {
+        closeModalBtn.addEventListener("click", (event) => {
+            event.stopPropagation();
             const modal = document.getElementById("ticket-modal");
-            if (modal) modal.hidden = true;
+            if (!modal) return;
+
+            // Chặn cú click/tap "đúp" còn sót từ nút Xác nhận rơi trúng nút Đóng
+            // ngay sau khi vé vừa mở — vé phải hiện đủ lâu để người dùng kịp đọc.
+            const openedAt = Number(modal.dataset.openedAt || 0);
+            if (Date.now() - openedAt < 1000) return;
+
+            modal.hidden = true;
         });
     }
 });

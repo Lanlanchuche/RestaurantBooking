@@ -986,7 +986,10 @@ def get_customer_reservations(
     return (
         query
         .order_by(
-            Reservation.reservation_time.desc(),
+            # Mới nhất theo THỜI ĐIỂM ĐẶT (created_at), không theo giờ bữa ăn:
+            # nếu sort theo reservation_time, một đơn vừa đặt cho khung giờ sớm
+            # sẽ bị chìm phía dưới các đơn cũ đặt cho khung giờ muộn hơn.
+            Reservation.created_at.desc(),
             Reservation.id.desc(),
         )
         .offset(skip)

@@ -52,8 +52,24 @@ async function loadReservationsFromApi() {
             reservations = [];
         }
     } catch (err) {
-        showToast("Lỗi khi tải lịch sử đặt bàn.", "danger");
-        reservations = [];
+        if (err && err.isNetworkError) {
+            // Backend không kết nối được -> đọc các đơn demo đã lưu trên trình duyệt
+            // (book.js chỉ lưu localStorage khi backend thật sự offline).
+            try {
+                const saved = JSON.parse(localStorage.getItem("customer_reservations") || "[]");
+                reservations = Array.isArray(saved) ? saved : [];
+            } catch {
+                reservations = [];
+            }
+            if (reservations.length) {
+                showToast("Backend đang offline — hiển thị lịch sử lưu trên trình duyệt.", "warning");
+            } else {
+                showToast("Lỗi khi tải lịch sử đặt bàn.", "danger");
+            }
+        } else {
+            showToast(err.message || "Lỗi khi tải lịch sử đặt bàn.", "danger");
+            reservations = [];
+        }
     } finally {
         setLoading(false);
     }

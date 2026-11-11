@@ -43,7 +43,11 @@ const api = {
                 body: body && typeof body !== "string" ? JSON.stringify(body) : body,
             });
         } catch {
-            throw new Error("Không kết nối được máy chủ. Hãy kiểm tra backend đang chạy.");
+            // Lỗi mạng (fetch throw) - khác với lỗi HTTP 4xx/5xx từ backend trả về.
+            // Đánh dấu để nơi gọi chỉ dùng fallback demo khi backend thực sự offline.
+            const networkError = new Error("Không kết nối được máy chủ. Hãy kiểm tra backend đang chạy.");
+            networkError.isNetworkError = true;
+            throw networkError;
         }
 
         if (response.status === 401) {
