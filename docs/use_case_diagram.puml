@@ -1,0 +1,135 @@
+@startuml TableReserve_UseCase
+' ============================================================
+' SƠ ĐỒ USE CASE TỔNG THỂ — TableReserve
+' Nguồn: backend/routers + docs/system_scope.md
+'
+' Cách render:
+'   - Dán vào https://www.plantuml.com/plantuml/uml/
+'   - Hoặc cài extension "PlantUML" trong VS Code rồi Alt+D
+' ============================================================
+
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI"
+skinparam usecase {
+  BackgroundColor #FFFDFA
+  BorderColor #7C2D2D
+  ArrowColor #7C2D2D
+}
+skinparam actor {
+  BackgroundColor #F4EFE7
+  BorderColor #7C2D2D
+}
+
+' ============================================================
+' TÁC NHÂN
+' ============================================================
+actor "Khách chưa đăng nhập" as Guest
+actor "Khách hàng\n(Customer)" as Customer
+actor "Chủ nhà hàng\n(Restaurant Owner)" as Owner
+actor "Hệ thống\n(Email · WebSocket · Dijkstra)" as System
+actor "Dịch vụ ngoài\n(OSM / Nominatim)" as OSM <<external>>
+
+Guest <|-- Customer
+Guest <|-- Owner
+
+' ============================================================
+' RANH GIỚI HỆ THỐNG
+' ============================================================
+rectangle "TableReserve — Hệ thống đặt bàn nhà hàng" {
+
+  package "Xác thực & Tài khoản" {
+    usecase "UC01\nĐăng ký tài khoản" as UC01
+    usecase "UC02\nĐăng nhập" as UC02
+    usecase "UC03\nĐăng xuất" as UC03
+    usecase "UC04\nXem / cập nhật hồ sơ" as UC04
+    usecase "UC05\nXóa tài khoản" as UC05
+  }
+
+  package "Khách hàng" {
+    usecase "UC10\nThiết lập vị trí\n(GPS / nhập địa chỉ)" as UC10
+    usecase "UC11\nTìm nhà hàng gần nhất" as UC11
+    usecase "UC12\nXem bản đồ &\nthông tin chi nhánh" as UC12
+    usecase "UC13\nĐặt bàn" as UC13
+    usecase "UC14\nXem lịch sử /\nchi tiết đặt bàn" as UC14
+    usecase "UC15\nHủy đặt bàn\n(trước 24 giờ)" as UC15
+  }
+
+  package "Chủ nhà hàng" {
+    usecase "UC20\nTạo / cập nhật\nhồ sơ nhà hàng" as UC20
+    usecase "UC21\nQuản lý chi nhánh\n(Thêm / Sửa / Xóa)" as UC21
+    usecase "UC22\nXem dashboard\nđặt bàn" as UC22
+    usecase "UC23\nNhận thông báo\nđặt bàn realtime" as UC23
+    usecase "UC24\nXác nhận đặt bàn" as UC24
+    usecase "UC25\nTừ chối đặt bàn\n(kèm lý do)" as UC25
+  }
+
+  package "Dịch vụ hệ thống" {
+    usecase "UC30\nGửi email thông báo\n(bất đồng bộ)" as UC30
+    usecase "UC31\nPhát sự kiện\nWebSocket" as UC31
+    usecase "UC32\nTính khoảng cách\nDijkstra / Haversine" as UC32
+    usecase "UC33\nĐồng bộ số bàn trống" as UC33
+    usecase "UC34\nKhóa chi nhánh\n(asyncio.Lock)" as UC34
+  }
+}
+
+' ============================================================
+' TÁC NHÂN → USE CASE
+' ============================================================
+Guest --> UC01
+Guest --> UC02
+
+Customer --> UC03
+Customer --> UC04
+Customer --> UC05
+Customer --> UC10
+Customer --> UC11
+Customer --> UC12
+Customer --> UC13
+Customer --> UC14
+Customer --> UC15
+
+Owner --> UC03
+Owner --> UC04
+Owner --> UC05
+Owner --> UC20
+Owner --> UC21
+Owner --> UC22
+Owner --> UC23
+Owner --> UC24
+Owner --> UC25
+
+' ============================================================
+' QUAN HỆ INCLUDE GIỮA CÁC USE CASE
+' ============================================================
+UC11 ..> UC10 : <<include>>
+UC11 ..> UC32 : <<include>>
+UC10 -- OSM
+
+UC13 ..> UC34 : <<include>>
+UC13 ..> UC33 : <<include>>
+UC13 ..> UC30 : <<include>>
+UC13 ..> UC31 : <<include>>
+
+UC15 ..> UC33 : <<include>>
+UC15 ..> UC30 : <<include>>
+
+UC24 ..> UC30 : <<include>>
+
+UC25 ..> UC33 : <<include>>
+UC25 ..> UC30 : <<include>>
+
+UC23 ..> UC31 : <<include>>
+
+' ============================================================
+' TÁC NHÂN PHỤ — DỊCH VỤ HỆ THỐNG
+' ============================================================
+UC30 -- System
+UC31 -- System
+UC32 -- System
+UC33 -- System
+UC34 -- System
+UC32 -- OSM
+
+@enduml

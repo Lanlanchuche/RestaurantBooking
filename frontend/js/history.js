@@ -1,0 +1,301 @@
+/**
+ * history.js - Reservation History Page Controller
+ * Hiển thị danh sách lịch sử đặt bàn, bộ lọc theo trạng thái và xử lý hủy đặt bàn (Quy tắc 24h).
+ */
+
+const CANCELLATION_WINDOW_HOURS = 24;
+
+
+
+let reservations = [];
+let currentFilter = "ALL";
+
+function formatDateVi(dateStr) {
+    if (!dateStr) return "--";
+    try {
+        const d = new Date(dateStr);
+        const days = ["Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
+        const dayName = days[d.getDay()];
+        const day = String(d.getDate()).padStart(2, "0");
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const year = d.getFullYear();
+        const hours = String(d.getHours()).padStart(2, "0");
+        const mins = String(d.getMinutes()).padStart(2, "0");
+        return `${hours}:${mins} • ${dayName}, ${day}/${month}/${year}`;
+    } catch {
+        return dateStr;
+    }
+}
+
+async function loadReservationsFromApi() {
+    try {
+        setLoading(true, "Đang tải lịch sử đặt bàn...");
+        const data = await api.get("/customer/reservations?limit=50");
+        if (Array.isArray(data)) {
+            reservations = data.map(item => ({
+                id: item.id,
+                branch_id: item.branch_id,
+                branch_name: item.branch?.name,
+                restaurant_name: item.branch?.name,
+                branch_address: item.branch?.address,
+                reservation_time: formatDateVi(item.reservation_time),
+                raw_time: item.reservation_time,
+                guest_count: item.guest_count,
+                table_number: item.table_number,
+                customer_name: item.customer?.full_name,
+                customer_phone: item.customer?.phone,
+                status: item.status,
+                special_requests: item.special_request,
+                created_at: item.created_at
+            }));
+        } else {
+            reservations = [];
+        }
+    } catch (err) {
+        if (err && err.isNetworkError) {
+            // Backend không kết nối được -> đọc các đơn demo đã lưu trên trình duyệt
+            // (book.js chỉ lưu localStorage khi backend thật sự offline).
+            try {
+                const saved = JSON.parse(localStorage.getItem("customer_reservations") || "[]");
+                reservations = Array.isArray(saved) ? saved : [];
+            } catch {
+                reservations = [];
+            }
+            if (reservations.length) {
+                showToast("Backend đang offline — hiển thị lịch sử lưu trên trình duyệt.", "warning");
+            } else {
+                showToast("Lỗi khi tải lịch sử đặt bàn.", "danger");
+            }
+        } else {
+            showToast(err.message || "Lỗi khi tải lịch sử đặt bàn.", "danger");
+            reservations = [];
+        }
+    } finally {
+        setLoading(false);
+    }
+}
+
+function updateStats(list) {
+    const totalEl = document.getElementById("stat-total");
+    const pendingEl = document.getElementById("stat-pending");
+    const confirmedEl = document.getElementById("stat-confirmed");
+    const cancelledEl = document.getElementById("stat-cancelled");
+
+    const total = list.length;
+    const pending = list.filter((r) => r.status === "PENDING").length;
+    const confirmed = list.filter((r) => r.status === "CONFIRMED").length;
+    const cancelled = list.filter((r) => r.status === "CANCELLED" || r.status === "REJECTED").length;
+
+    if (totalEl) totalEl.textContent = total;
+    if (pendingEl) pendingEl.textContent = pending;
+    if (confirmedEl) confirmedEl.textContent = confirmed;
+    if (cancelledEl) cancelledEl.textContent = cancelled;
+}
+
+function getStatusBadgeHtml(status) {
+    switch (status) {
+        case "PENDING":
+            return `<span class="status-badge pending">⏳ Chờ duyệt</span>`;
+        case "CONFIRMED":
+            return `<span class="status-badge confirmed">✓ Đã xác nhận</span>`;
+        case "REJECTED":
+            return `<span class="status-badge rejected">✕ Từ chối</span>`;
+        case "CANCELLED":
+            return `<span class="status-badge cancelled">⊘ Đã hủy</span>`;
+        default:
+            return `<span class="status-badge">${status || "Mới"}</span>`;
+    }
+}
+
+/**
+ * Kiểm tra quy tắc 24h (BR-01)
+ */
+function canCancelReservation(reservation) {
+    if (reservation.status !== "PENDING" && reservation.status !== "CONFIRMED") {
+        return { allowed: false, reason: "Đơn đặt này đã hoàn tất hoặc đã được xử lý." };
+    }
+
+    if (!reservation.raw_time) {
+        return { allowed: true };
+    }
+
+    const resDate = new Date(reservation.raw_time);
+    const now = new Date();
+    const diffHours = (resDate - now) / (1000 * 60 * 60);
+
+    if (diffHours < CANCELLATION_WINDOW_HOURS) {
+        return {
+            allowed: false,
+            reason: `Quy tắc BR-01: Chỉ có thể hủy đặt bàn trước ít nhất ${CANCELLATION_WINDOW_HOURS} giờ so với giờ hẹn (còn lại ~${Math.max(0, Math.round(diffHours))} giờ). Vui lòng liên hệ trực tiếp nhà hàng.`
+        };
+    }
+
+    return { allowed: true };
+}
+
+function renderReservationsList() {
+    const container = document.getElementById("reservations-list-container");
+    if (!container) return;
+
+    let filtered = reservations;
+    if (currentFilter !== "ALL") {
+        filtered = reservations.filter((r) => r.status === currentFilter);
+    }
+
+    if (filtered.length === 0) {
+        container.innerHTML = `
+            <div style="text-align:center; padding:50px 20px; background:var(--paper); border:1px solid var(--line); border-radius:24px;">
+                <span style="font-size:3rem; display:block; margin-bottom:12px;">🍽</span>
+                <h3 style="font-family:Fraunces,serif; color:var(--wine-deep); margin:0 0 8px;">Không có đặt bàn nào</h3>
+                <p style="color:var(--muted); margin:0 0 20px;">Bạn chưa có lịch hẹn nào trong danh mục này.</p>
+                <a href="book.html" class="btn-primary" style="display:inline-block; text-decoration:none;">Đặt bàn ngay</a>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = "";
+
+    filtered.forEach((res) => {
+        const item = document.createElement("article");
+        item.className = "reservation-card-item";
+
+        const dishesText = Array.isArray(res.pre_ordered_dishes) && res.pre_ordered_dishes.length > 0
+            ? res.pre_ordered_dishes.map((d) => `${d.name} (×${d.quantity || 1})`).join(", ")
+            : "Gọi món tại nhà hàng";
+
+        const canCancel = (res.status === "PENDING" || res.status === "CONFIRMED");
+
+        item.innerHTML = `
+            <div class="res-card-header">
+                <div>
+                    <h3 class="res-branch-name">${res.restaurant_name || res.branch_name}</h3>
+                    <div style="font-size:0.88rem; color:var(--muted);">${res.branch_address || ""}</div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="margin-bottom:6px;">${getStatusBadgeHtml(res.status)}</div>
+                    <span class="res-code-badge">Mã: ${res.id}</span>
+                </div>
+            </div>
+
+            <div class="res-info-grid">
+                <div class="res-info-item">
+                    <div class="res-info-label">🕒 Thời gian dùng bữa</div>
+                    <div class="res-info-val">${res.reservation_time}</div>
+                </div>
+                <div class="res-info-item">
+                    <div class="res-info-label">👥 Số lượng khách</div>
+                    <div class="res-info-val">${res.guest_count} khách${res.seating_area ? ` (${res.seating_area})` : ""}</div>
+                </div>
+                <div class="res-info-item">
+                    <div class="res-info-label">🪑 Số bàn</div>
+                    <div class="res-info-val">${res.table_number ? `Bàn số ${res.table_number}` : "Sắp xếp khi nhận bàn"}</div>
+                </div>
+                <div class="res-info-item">
+                    <div class="res-info-label">👤 Khách liên hệ</div>
+                    <div class="res-info-val">${res.customer_name} • ${res.customer_phone}</div>
+                </div>
+                ${Array.isArray(res.pre_ordered_dishes) && res.pre_ordered_dishes.length > 0 ? `
+                <div class="res-info-item" style="grid-column: 1 / -1;">
+                    <div class="res-info-label">🍲 Món đặt trước</div>
+                    <div class="res-info-val" style="color:var(--wine);">${dishesText}</div>
+                </div>
+                ` : ""}
+                ${res.special_requests ? `
+                <div class="res-info-item" style="grid-column: 1 / -1;">
+                    <div class="res-info-label">📝 Yêu cầu đặc biệt</div>
+                    <div class="res-info-val" style="color:var(--muted); font-style:italic;">${res.special_requests}</div>
+                </div>
+                ` : ""}
+            </div>
+
+            <div class="res-card-footer">
+                <div class="res-rule-note">
+                    <span>🛡</span>
+                    <span>Quy tắc 24h: Hủy miễn phí trước giờ đặt 24 tiếng</span>
+                </div>
+                <div>
+                    ${canCancel ? `
+                        <button type="button" class="btn-danger btn-cancel-res" data-id="${res.id}" style="padding:7px 18px; font-size:0.86rem;">
+                            Hủy đặt bàn
+                        </button>
+                    ` : ""}
+                </div>
+            </div>
+        `;
+
+        container.appendChild(item);
+    });
+
+    // Gắn sự kiện nút Hủy đặt bàn
+    container.querySelectorAll(".btn-cancel-res").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            const id = btn.dataset.id;
+            handleCancel(id);
+        });
+    });
+}
+
+async function handleCancel(id) {
+    const item = reservations.find((r) => r.id == id);
+    if (!item) return;
+
+    const check = canCancelReservation(item);
+    if (!check.allowed) {
+        showToast(check.reason, "danger", 5000);
+        return;
+    }
+
+    const confirmCancel = confirm(`Bạn có chắc chắn muốn hủy đặt bàn tại ${item.restaurant_name || item.branch_name} (Mã: ${item.id}) không?`);
+    if (!confirmCancel) return;
+
+    try {
+        setLoading(true, "Đang xử lý hủy đặt bàn...");
+        await api.patch(`/customer/reservations/${item.id}/cancel`);
+        
+        item.status = "CANCELLED";
+        updateStats(reservations);
+        renderReservationsList();
+        showToast(`Đã hủy đặt bàn mã ${item.id} thành công.`, "success");
+    } catch (err) {
+        showToast(err.message || "Lỗi khi hủy đặt bàn.", "danger");
+    } finally {
+        setLoading(false);
+    }
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+    const user = requireAuth("CUSTOMER");
+    if (!user) return;
+
+    // Header user display
+    const name = displayName(user) || "Khách";
+    const nameEl = document.getElementById("dash-user-name") || document.getElementById("hist-user-name");
+    const avatarEl = document.getElementById("dash-avatar") || document.getElementById("hist-user-avatar");
+    if (nameEl) nameEl.textContent = name;
+    if (avatarEl) {
+        const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+        const initials = !parts.length ? "?" : (parts.length === 1 ? parts[0].slice(0, 2).toUpperCase() : (parts[0][0] + parts[parts.length - 1][0]).toUpperCase());
+        avatarEl.textContent = initials;
+    }
+
+    // Tải dữ liệu đặt bàn
+    await loadReservationsFromApi();
+    updateStats(reservations);
+    renderReservationsList();
+
+    // Filter tabs
+    document.querySelectorAll(".filter-tab-btn").forEach((tab) => {
+        tab.addEventListener("click", () => {
+            document.querySelectorAll(".filter-tab-btn").forEach((t) => t.classList.remove("active"));
+            tab.classList.add("active");
+            currentFilter = tab.dataset.filter || "ALL";
+            renderReservationsList();
+        });
+    });
+
+    const logoutBtn = document.getElementById("btn-logout") || document.getElementById("btn-hist-logout");
+    if (logoutBtn) {
+        logoutBtn.addEventListener("click", logout);
+    }
+});
