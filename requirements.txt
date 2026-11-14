@@ -20,3 +20,5 @@ osmnx>=2.0
 
 # Testing
 pytest>=8.0
+
+psycopg2-binary

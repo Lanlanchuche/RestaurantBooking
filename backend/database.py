@@ -1,12 +1,3 @@
-"""
-database.py
-
-Cấu hình kết nối cơ sở dữ liệu SQLite cho toàn bộ ứng dụng TableReserve.
-Bật WAL (Write-Ahead Logging) mode để cho phép đọc/ghi đồng thời tốt hơn,
-tránh lỗi "database is locked" khi nhiều request truy cập cùng lúc
-(ví dụ: nhiều khách hàng đặt bàn ở cùng một chi nhánh cùng lúc).
-"""
-
 import logging
 import os
 
@@ -16,41 +7,43 @@ from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 logger = logging.getLogger(__name__)
 
-# Cho phép override qua biến môi trường khi deploy, mặc định dùng file SQLite
-# nằm cùng cấp với backend/.
+# Lấy DATABASE_URL từ biến môi trường (Render), nếu không có thì dùng SQLite local
 DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./tablereserve.db")
 
-# SQLite mặc định chỉ cho phép 1 thread sử dụng 1 connection. FastAPI có thể
-# xử lý các request trên nhiều thread khác nhau nên phải tắt kiểm tra này.
-engine: Engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False},
-)
+# Xử lý đặc thù cho Render: PostgreSQL URL đôi khi bắt đầu bằng 'postgres://' 
+# thay vì 'postgresql://' mà SQLAlchemy yêu cầu.
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+# Kiểm tra xem đang dùng SQLite hay PostgreSQL để cấu hình connect_args phù hợp
+if DATABASE_URL.startswith("sqlite"):
+    # SQLite yêu cầu check_same_thread=False để FastAPI xử lý đa luồng
+    engine: Engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False},
+    )
+else:
+    # PostgreSQL trên Render
+    engine: Engine = create_engine(DATABASE_URL)
 
 
-@event.listens_for(engine, "connect")
-def _configure_sqlite_connection(dbapi_connection, connection_record) -> None:
-    """
-    Thiết lập PRAGMA cần thiết mỗi khi một connection SQLite mới được mở.
-
-    - journal_mode=WAL: cho phép một transaction ghi chạy đồng thời với
-      nhiều transaction đọc, thay vì khóa toàn bộ file .db như chế độ
-      rollback journal mặc định.
-    - foreign_keys=ON: SQLite không tự bật ràng buộc khóa ngoại theo mặc
-      định, nếu không bật thì các `ondelete="CASCADE"` khai báo trong
-      models.py sẽ bị bỏ qua khi xóa dữ liệu.
-    """
-    cursor = dbapi_connection.cursor()
-    try:
-        cursor.execute("PRAGMA journal_mode=WAL;")
-        cursor.execute("PRAGMA foreign_keys=ON;")
-    except Exception as exc:
-        # Không nuốt lỗi âm thầm — log lại để dev biết PRAGMA nào thất bại,
-        # nhưng không raise vì đây không phải lỗi nghiêm trọng tới mức
-        # phải chặn ứng dụng khởi động.
-        logger.warning("Không thể thiết lập PRAGMA cho SQLite: %s", exc)
-    finally:
-        cursor.close()
+# Chỉ áp dụng PRAGMA WAL và foreign_keys khi chạy SQLite local
+if DATABASE_URL.startswith("sqlite"):
+    @event.listens_for(engine, "connect")
+    def _configure_sqlite_connection(dbapi_connection, connection_record) -> None:
+        """
+        Thiết lập PRAGMA cho SQLite:
+        - journal_mode=WAL: hạn chế lỗi khóa database khi đọc/ghi đồng thời.
+        - foreign_keys=ON: kích hoạt ràng buộc khóa ngoại cho SQLite.
+        """
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute("PRAGMA journal_mode=WAL;")
+            cursor.execute("PRAGMA foreign_keys=ON;")
+        except Exception as exc:
+            logger.warning("Không thể thiết lập PRAGMA cho SQLite: %s", exc)
+        finally:
+            cursor.close()
 
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
