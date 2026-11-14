@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:8000/api";
+const API_BASE = "https://restaurantbooking-flx9.onrender.com/";
 const WS_BASE = "ws://localhost:8000";
 
 function parseApiError(payload, fallback) {
