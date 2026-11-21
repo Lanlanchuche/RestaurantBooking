@@ -1,32 +1,30 @@
-// Địa chỉ backend khi deploy lên Render.
-// API_BASE chỉ là host (không kèm /api): mọi nơi gọi api.get/post/... truyền
-// endpoint không có prefix, vd. api.get("/customer/branches").
 const API_BASE = "https://restaurantbooking-flx9.onrender.com";
+const WS_BASE = "wss://restaurantbooking-flx9.onrender.com";
+
+// Toàn bộ endpoint của backend nằm dưới tiền tố /api.
 const API_PREFIX = "/api";
-// WS_BASE tự suy ra từ API_BASE (https -> wss) nên chỉ cần đổi API_BASE một lần.
-// Render bắt buộc dùng wss:// cho websocket trên HTTPS.
-const WS_BASE = toWebSocketUrl(API_BASE);
 
+// Ghép base + endpoint, tránh lặp hoặc thiếu dấu "/" ở giữa.
 function joinUrl(base, path) {
-    if (!path) {
-        return base;
-    }
-
-    // Endpoint đã là URL tuyệt đối thì giữ nguyên.
-    if (/^https?:\/\//i.test(path)) {
-        return path;
-    }
-
-    return `${base.replace(/\/+$/, "")}/${String(path).replace(/^\/+/, "")}`;
+    return `${String(base).replace(/\/+$/, "")}/${String(path).replace(/^\/+/, "")}`;
 }
 
+// Dựng URL đầy đủ: tự thêm /api nếu nơi gọi chưa truyền.
 function buildApiUrl(endpoint) {
-    return joinUrl(joinUrl(API_BASE, API_PREFIX), endpoint);
+    const raw = String(endpoint || "");
+    const path = raw.startsWith("/") ? raw : `/${raw}`;
+    const fullPath =
+        path === API_PREFIX || path.startsWith(`${API_PREFIX}/`) ? path : `${API_PREFIX}${path}`;
+    return joinUrl(API_BASE, fullPath);
 }
 
+// WebSocket chỉ nhận ws:// hoặc wss://, nên phải đổi http(s):// -> ws(s)://
 function toWebSocketUrl(url) {
-    // http -> ws, https -> wss (Render bắt buộc dùng wss trên HTTPS).
-    return url.replace(/^http/i, "ws");
+    return String(url)
+        .trim()
+        .replace(/^https:\/\//i, "wss://")
+        .replace(/^http:\/\//i, "ws://")
+        .replace(/\/+$/, "");
 }
 
 function parseApiError(payload, fallback) {
@@ -122,17 +120,10 @@ const api = {
     },
 
     wsUrl(path) {
-        // Router WebSocket của backend nằm ở /ws/... (không có prefix /api).
-        const base = WS_BASE || toWebSocketUrl(API_BASE);
-        let url = joinUrl(base, path);
-
-        // Đảm bảo luôn là ws:// hoặc wss:// cho new WebSocket(...).
-        url = toWebSocketUrl(url);
-
         const token = typeof getToken === "function" ? getToken() : "";
-        const separator = url.includes("?") ? "&" : "?";
-
-        return `${url}${separator}token=${encodeURIComponent(token || "")}`;
+        const wsPath = String(path).startsWith("/") ? String(path) : `/${path}`;
+        const separator = wsPath.includes("?") ? "&" : "?";
+        return `${toWebSocketUrl(WS_BASE)}${wsPath}${separator}token=${encodeURIComponent(token || "")}`;
     },
 };
 

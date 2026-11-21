@@ -14,7 +14,7 @@ Giao diện toàn bộ bằng tiếng Việt.
 | Tầng | Công nghệ |
 |---|---|
 | Backend | Python 3.11+, FastAPI, SQLAlchemy 2, Uvicorn |
-| Database | SQLite (`tablereserve.db`) |
+| Database | SQLite local (`tablereserve.db`); PostgreSQL khi deploy lên Render (qua `DATABASE_URL`, driver `psycopg`) |
 | Định tuyến đường bộ | OSMnx + NetworkX (thuật toán Dijkstra trên đồ thị OpenStreetMap), fallback Haversine |
 | Geocoding địa chỉ | Nominatim / Photon (gọi phía client trong `frontend/js/book.js`) |
 | Bản đồ | Leaflet 1.9 |
@@ -94,11 +94,11 @@ Frontend là file tĩnh. Địa chỉ backend nằm ở đầu `frontend/js/api.
 
 ```js
 const API_BASE = "https://restaurantbooking-flx9.onrender.com"; // host, không kèm /api
-const API_PREFIX = "/api";                                      // tự nối khi gọi api.get/post
-const WS_BASE = toWebSocketUrl(API_BASE);                       // ws:// hoặc wss://
+const WS_BASE = "wss://restaurantbooking-flx9.onrender.com";    // ws:// hoặc wss://
+const API_PREFIX = "/api";                                      // buildApiUrl() tự nối khi gọi api.get/post
 ```
 
-Khi chạy backend local thì đổi `API_BASE = "http://localhost:8000"` (WS tự chuyển thành `ws://localhost:8000`).
+Khi chạy backend local thì sửa thành `API_BASE = "http://localhost:8000"` và `WS_BASE = "ws://localhost:8000"`.
 
 - Cách 1: mở `frontend/index.html` bằng **Live Server** của VS Code (cấu hình sẵn port `5501` trong `.vscode/settings.json`).
 - Cách 2: phục vụ tĩnh bất kỳ, VD `npx serve frontend`.
