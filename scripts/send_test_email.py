@@ -90,9 +90,11 @@ async def main() -> None:
                 f"TableReserve - Email thử nghiệm ({label})",
                 html_content,
             )
-        finally:
-            email_service.shutdown()
+        except Exception as exc:
+            print(f"Lỗi khi gửi tới {recipient}: {exc}")
 
+    # Đợi mọi email trong hàng đợi gửi xong rồi mới dừng thread pool.
+    email_service.shutdown()
     print("Đã chạy xong. Kiểm tra hộp thư (cả mục Spam) và log server.")
 
 
