@@ -2,22 +2,36 @@
 email_service.py
 
 Dịch vụ gửi email thông báo tự động.
-Hỗ trợ gửi email bất đồng bộ thông qua ThreadPoolExecutor và smtplib,
-định dạng HTML email với giao diện sáng (light theme) theo bảng màu
-wine / gold / paper của TableReserve.
+Hỗ trợ gửi email bất đồng bộ thông qua ThreadPoolExecutor, định dạng HTML
+email với giao diện sáng (light theme) theo bảng màu wine / gold / paper
+của TableReserve.
 
-Cấu hình SMTP được đọc từ biến môi trường tại thời điểm gửi:
-    SMTP_HOST (mặc định: smtp.gmail.com)
-    SMTP_PORT (mặc định: 587)
-    SMTP_USER
-    SMTP_PASSWORD
-    SMTP_USE_SSL (mặc định: false — dùng STARTTLS; bật cho cổng 465)
-    SMTP_TIMEOUT (mặc định: 15 giây)
-    SMTP_MAX_RETRIES (mặc định: 3 lần)
-    SMTP_RETRY_DELAY (mặc định: 2 giây, tăng dần theo cấp số nhân)
+Hai cách gửi, chọn bằng EMAIL_PROVIDER (mặc định "auto"):
 
-Nếu chưa cấu hình SMTP_USER/SMTP_PASSWORD, email sẽ được in ra log ở mức
-WARNING thay vì gửi thật để phục vụ phát triển.
+1. HTTPS API (khuyến nghị khi deploy lên PaaS — cổng 443 luôn mở):
+       EMAIL_PROVIDER = resend | sendgrid | brevo
+       RESEND_API_KEY / SENDGRID_API_KEY / BREVO_API_KEY
+       EMAIL_FROM = "TableReserve <no-reply@domain-cua-ban>"
+
+2. SMTP (chỉ dùng khi máy chủ cho phép cổng 25/465/587):
+       SMTP_HOST (mặc định: smtp.gmail.com)
+       SMTP_PORT (mặc định: 587)
+       SMTP_USER
+       SMTP_PASSWORD
+       SMTP_USE_SSL (mặc định: false — dùng STARTTLS; bật cho cổng 465)
+       SMTP_TIMEOUT (mặc định: 15 giây)
+       SMTP_MAX_RETRIES (mặc định: 3 lần)
+       SMTP_RETRY_DELAY (mặc định: 2 giây, tăng dần theo cấp số nhân)
+
+Chế độ "auto": dùng API key HTTPS nếu có (resend → sendgrid → brevo),
+sau đó mới đến SMTP nếu có SMTP_USER/SMTP_PASSWORD.
+
+Nếu không cấu hình được cách nào, email sẽ được in ra log ở mức WARNING
+thay vì gửi thật để phục vụ phát triển.
+
+Lưu ý triển khai: Render chặn outbound tới cổng 25/465/587 với web service
+gói Free (từ 26/09/2025), nên Gmail SMTP chỉ gửi được khi nâng lên gói trả
+phí hoặc chuyển sang EMAIL_PROVIDER dùng HTTPS API.
 
 Mỗi email được gửi dưới dạng multipart/alternative gồm bản text/plain và
 text/html. Các lần gửi được đưa vào hàng đợi của ThreadPoolExecutor và tự
@@ -28,14 +42,18 @@ from __future__ import annotations
 
 import asyncio
 import html
+import json
 import logging
 import os
 import smtplib
 import time
+import urllib.error
+import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.utils import parseaddr
 from html.parser import HTMLParser
 
 logger = logging.getLogger(__name__)
@@ -49,6 +67,39 @@ DEFAULT_SMTP_PORT = 587
 DEFAULT_SMTP_TIMEOUT_SECONDS = 15
 DEFAULT_SMTP_MAX_RETRIES = 3
 DEFAULT_SMTP_RETRY_DELAY_SECONDS = 2.0
+
+DEFAULT_FROM_NAME = "TableReserve"
+
+# Các nhà cung cấp gửi email qua HTTPS API (không dùng cổng SMTP).
+HTTP_PROVIDERS = ("resend", "sendgrid", "brevo")
+
+HTTP_API_ENDPOINTS = {
+    "resend": "https://api.resend.com/emails",
+    "sendgrid": "https://api.sendgrid.com/v3/mail/send",
+    "brevo": "https://api.brevo.com/v3/smtp/email",
+}
+
+API_KEY_ENV = {
+    "resend": "RESEND_API_KEY",
+    "sendgrid": "SENDGRID_API_KEY",
+    "brevo": "BREVO_API_KEY",
+}
+
+
+class EmailDeliveryError(Exception):
+    """Lỗi trả về từ HTTPS API của nhà cung cấp email."""
+
+    def __init__(self, status_code: int, body: str):
+        self.status_code = status_code
+        self.body = body
+        self.retryable = status_code == 429 or status_code >= 500
+        super().__init__(f"HTTP {status_code}: {body[:300]}")
+
+
+class EmailConfigError(Exception):
+    """Cấu hình email thiếu hoặc sai — không thử lại vì không thể tự khỏi."""
+
+    retryable = False
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -124,6 +175,245 @@ def _smtp_config() -> dict:
             0.0,
         ),
     }
+
+
+def _from_address() -> str:
+    """Địa chỉ gửi hiển thị trên email, ưu tiên EMAIL_FROM rồi tới SMTP_USER."""
+
+    explicit = (os.getenv("EMAIL_FROM") or "").strip()
+
+    if explicit:
+        return explicit
+
+    smtp_user = (os.getenv("SMTP_USER") or "").strip()
+
+    if smtp_user:
+        return f"{DEFAULT_FROM_NAME} <{smtp_user}>"
+
+    return ""
+
+
+def _api_key_for(provider: str) -> str:
+    """Đọc API key tương ứng với nhà cung cấp HTTPS."""
+
+    return (os.getenv(API_KEY_ENV.get(provider, "")) or "").strip()
+
+
+def _resolve_provider() -> str:
+    """
+    Xác định cách gửi email.
+
+    Giá trị EMAIL_PROVIDER hợp lệ: auto, smtp, resend, sendgrid, brevo, mock.
+    Chế độ auto ưu tiên HTTPS API (không bị chặn cổng khi deploy), sau đó SMTP,
+    cuối cùng là mock (chỉ ghi log).
+    """
+
+    raw_value = (os.getenv("EMAIL_PROVIDER") or "auto").strip().lower()
+
+    if raw_value in HTTP_PROVIDERS:
+        if _api_key_for(raw_value):
+            return raw_value
+
+        logger.warning(
+            "EMAIL_PROVIDER=%s nhưng thiếu %s, chuyển sang chế độ auto.",
+            raw_value,
+            API_KEY_ENV[raw_value],
+        )
+    elif raw_value == "smtp":
+        smtp = _smtp_config()
+
+        if smtp["user"] and smtp["password"]:
+            return "smtp"
+
+        logger.warning(
+            "EMAIL_PROVIDER=smtp nhưng thiếu SMTP_USER/SMTP_PASSWORD, "
+            "chuyển sang mock mode."
+        )
+        return "mock"
+    elif raw_value == "mock":
+        return "mock"
+    elif raw_value not in {"", "auto"}:
+        logger.warning(
+            "EMAIL_PROVIDER=%r không hợp lệ, dùng chế độ auto.",
+            raw_value,
+        )
+
+    for provider in HTTP_PROVIDERS:
+        if _api_key_for(provider):
+            return provider
+
+    smtp = _smtp_config()
+
+    if smtp["user"] and smtp["password"]:
+        return "smtp"
+
+    return "mock"
+
+
+def _email_config() -> dict:
+    """Cấu hình gửi email dùng chung cho SMTP và HTTPS API."""
+
+    smtp = _smtp_config()
+    provider = _resolve_provider()
+
+    return {
+        "provider": provider,
+        "api_key": _api_key_for(provider) if provider in HTTP_PROVIDERS else "",
+        "from": _from_address(),
+        "timeout": _env_number(
+            "EMAIL_TIMEOUT",
+            smtp["timeout"],
+            float,
+            1.0,
+        ),
+        "max_retries": _env_number(
+            "EMAIL_MAX_RETRIES",
+            smtp["max_retries"],
+            int,
+            1,
+        ),
+        "retry_delay": _env_number(
+            "EMAIL_RETRY_DELAY",
+            smtp["retry_delay"],
+            float,
+            0.0,
+        ),
+        "smtp": smtp,
+    }
+
+
+def _post_json(url: str, headers: dict, payload: dict, timeout: float) -> None:
+    """POST JSON tới API của nhà cung cấp, raise EmailDeliveryError khi lỗi."""
+
+    body = json.dumps(payload).encode("utf-8")
+    request = urllib.request.Request(
+        url,
+        data=body,
+        headers={"Content-Type": "application/json", **headers},
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            response.read()
+
+            if not 200 <= response.status < 300:
+                raise EmailDeliveryError(response.status, "")
+
+    except urllib.error.HTTPError as exc:
+        error_body = exc.read().decode("utf-8", "replace")
+        raise EmailDeliveryError(exc.code, error_body) from exc
+
+
+def _send_via_http(
+    provider: str,
+    config: dict,
+    to_email: str,
+    subject: str,
+    html_content: str,
+    text_content: str,
+) -> None:
+    """Gửi email qua HTTPS API (Resend / SendGrid / Brevo)."""
+
+    if not config["api_key"]:
+        raise EmailConfigError(
+            f"Thiếu {API_KEY_ENV[provider]} cho EMAIL_PROVIDER={provider}."
+        )
+
+    if not config["from"]:
+        raise EmailConfigError(
+            "Thiếu EMAIL_FROM (địa chỉ gửi đã xác thực ở nhà cung cấp email)."
+        )
+
+    from_name, from_email = parseaddr(config["from"])
+
+    if not from_email:
+        from_email = config["from"]
+        from_name = DEFAULT_FROM_NAME
+
+    url = HTTP_API_ENDPOINTS[provider]
+
+    if provider == "resend":
+        headers = {"Authorization": f"Bearer {config['api_key']}"}
+        payload = {
+            "from": config["from"],
+            "to": [to_email],
+            "subject": subject,
+            "html": html_content,
+        }
+
+        if text_content:
+            payload["text"] = text_content
+
+    elif provider == "sendgrid":
+        headers = {"Authorization": f"Bearer {config['api_key']}"}
+        payload = {
+            "personalizations": [{"to": [{"email": to_email}]}],
+            "from": {
+                "email": from_email,
+                "name": from_name or DEFAULT_FROM_NAME,
+            },
+            "subject": subject,
+            "content": [
+                {"type": "text/plain", "value": text_content or subject},
+                {"type": "text/html", "value": html_content},
+            ],
+        }
+
+    else:  # brevo
+        headers = {"api-key": config["api_key"], "accept": "application/json"}
+        payload = {
+            "sender": {
+                "email": from_email,
+                "name": from_name or DEFAULT_FROM_NAME,
+            },
+            "to": [{"email": to_email}],
+            "subject": subject,
+            "htmlContent": html_content,
+        }
+
+        if text_content:
+            payload["textContent"] = text_content
+
+    _post_json(url, headers, payload, config["timeout"])
+
+
+def log_email_status() -> None:
+    """Ghi log cách gửi email đang dùng để dễ chẩn đoán khi deploy."""
+
+    config = _email_config()
+    provider = config["provider"]
+    running_on_render = bool(os.getenv("RENDER"))
+
+    if provider == "mock":
+        logger.warning(
+            "Chưa cấu hình email: cần đặt %s hoặc SMTP_USER/SMTP_PASSWORD. "
+            "Email sẽ chỉ được in ra log (mock mode).",
+            "/".join(API_KEY_ENV.values()),
+        )
+        return
+
+    if provider == "smtp":
+        logger.info(
+            "Email provider: SMTP (%s:%s).",
+            config["smtp"]["host"],
+            config["smtp"]["port"],
+        )
+
+        if running_on_render:
+            logger.warning(
+                "Render chặn outbound tới cổng 25/465/587 trên gói Free, nên "
+                "SMTP (cả 465 và 587) có thể timeout. Hãy đặt "
+                "EMAIL_PROVIDER=brevo|sendgrid|resend kèm API key, hoặc nâng "
+                "lên gói trả phí."
+            )
+        return
+
+    logger.info(
+        "Email provider: %s (HTTPS API), gửi từ %s.",
+        provider,
+        config["from"] or "(chưa đặt EMAIL_FROM)",
+    )
 
 
 class _HTMLToTextParser(HTMLParser):
@@ -393,6 +683,79 @@ class EmailService:
     # SENDING
     # ------------------------------------------------------------------
 
+    def _deliver_smtp(
+        self,
+        config: dict,
+        to_email: str,
+        subject: str,
+        html_content: str,
+        text_content: str,
+    ) -> None:
+        """Gửi một email qua SMTP (chạy trong thread riêng)."""
+
+        smtp = config["smtp"]
+        message = MIMEMultipart("alternative")
+        message["Subject"] = subject
+        message["From"] = config["from"] or f"{DEFAULT_FROM_NAME} <{smtp['user']}>"
+        message["To"] = to_email
+
+        # Thứ tự part: text trước, HTML sau (HTML là bản ưu tiên hiển thị).
+        if text_content:
+            message.attach(MIMEText(text_content, "plain", "utf-8"))
+
+        message.attach(MIMEText(html_content, "html", "utf-8"))
+
+        if smtp["use_ssl"]:
+            client = smtplib.SMTP_SSL(
+                smtp["host"],
+                smtp["port"],
+                timeout=config["timeout"],
+            )
+        else:
+            client = smtplib.SMTP(
+                smtp["host"],
+                smtp["port"],
+                timeout=config["timeout"],
+            )
+
+        with client:
+            if not smtp["use_ssl"]:
+                client.starttls()
+
+            client.login(smtp["user"], smtp["password"])
+            client.send_message(message)
+
+    def _deliver(
+        self,
+        config: dict,
+        to_email: str,
+        subject: str,
+        html_content: str,
+        text_content: str,
+    ) -> None:
+        """Gửi một lần theo provider đã chọn."""
+
+        provider = config["provider"]
+
+        if provider == "smtp":
+            self._deliver_smtp(
+                config,
+                to_email,
+                subject,
+                html_content,
+                text_content,
+            )
+            return
+
+        _send_via_http(
+            provider,
+            config,
+            to_email,
+            subject,
+            html_content,
+            text_content,
+        )
+
     def _send_sync(
         self,
         to_email: str,
@@ -403,11 +766,13 @@ class EmailService:
         """
         Gửi email đồng bộ (được chạy trong ThreadPoolExecutor).
 
-        Tự động thử lại tối đa SMTP_MAX_RETRIES lần với thời gian chờ
-        tăng dần (SMTP_RETRY_DELAY, nhân đôi sau mỗi lần lỗi).
+        Provider được chọn theo EMAIL_PROVIDER (auto: HTTPS API → SMTP → mock).
+        Tự động thử lại tối đa EMAIL_MAX_RETRIES lần với thời gian chờ tăng dần
+        (EMAIL_RETRY_DELAY, nhân đôi sau mỗi lần lỗi). Chỉ thử lại với lỗi tạm
+        thời (mạng, 429, 5xx); lỗi 4xx do cấu hình sai thì dừng ngay.
         """
 
-        config = _smtp_config()
+        config = _email_config()
 
         # Chặn header injection qua subject/địa chỉ người nhận.
         to_email = to_email.strip()
@@ -416,7 +781,7 @@ class EmailService:
         if text_content is None:
             text_content = _html_to_text(html_content)
 
-        if not config["user"] or not config["password"]:
+        if config["provider"] == "mock":
             logger.warning(
                 "\n[MOCK EMAIL] To: %s\n[Subject]: %s\n[Body]:\n%s\n",
                 to_email,
@@ -425,49 +790,35 @@ class EmailService:
             )
             return
 
-        message = MIMEMultipart("alternative")
-        message["Subject"] = subject
-        message["From"] = f"TableReserve <{config['user']}>"
-        message["To"] = to_email
-
-        # Thứ tự part: text trước, HTML sau (HTML là bản ưu tiên hiển thị).
-        if text_content:
-            message.attach(MIMEText(text_content, "plain", "utf-8"))
-
-        message.attach(MIMEText(html_content, "html", "utf-8"))
-
         max_retries = config["max_retries"]
 
         for attempt in range(1, max_retries + 1):
             try:
-                if config["use_ssl"]:
-                    client = smtplib.SMTP_SSL(
-                        config["host"],
-                        config["port"],
-                        timeout=config["timeout"],
-                    )
-                else:
-                    client = smtplib.SMTP(
-                        config["host"],
-                        config["port"],
-                        timeout=config["timeout"],
-                    )
+                self._deliver(
+                    config,
+                    to_email,
+                    subject,
+                    html_content,
+                    text_content or "",
+                )
 
-                with client:
-                    if not config["use_ssl"]:
-                        client.starttls()
-
-                    client.login(config["user"], config["password"])
-                    client.send_message(message)
-
-                logger.info("Đã gửi email tới %s (%s).", to_email, subject)
+                logger.info(
+                    "Đã gửi email tới %s (%s) qua %s.",
+                    to_email,
+                    subject,
+                    config["provider"],
+                )
                 return
 
             except Exception as exc:
-                if attempt >= max_retries:
+                retryable = getattr(exc, "retryable", True)
+
+                if not retryable or attempt >= max_retries:
                     logger.exception(
-                        "Gửi email tới %s thất bại sau %s lần thử.",
+                        "Gửi email tới %s thất bại qua %s (%s/%s lần thử).",
                         to_email,
+                        config["provider"],
+                        attempt,
                         max_retries,
                     )
                     return
@@ -475,11 +826,12 @@ class EmailService:
                 delay = config["retry_delay"] * (2 ** (attempt - 1))
 
                 logger.warning(
-                    "Gửi email tới %s thất bại (lần %s/%s): %s. "
+                    "Gửi email tới %s thất bại (lần %s/%s) qua %s: %s. "
                     "Thử lại sau %.1f giây.",
                     to_email,
                     attempt,
                     max_retries,
+                    config["provider"],
                     exc,
                     delay,
                 )
@@ -588,7 +940,8 @@ class EmailService:
 
     async def send_confirmed(self, customer, branch, reservation):
         """
-        Gửi thông báo xác nhận đặt bàn thành công tới khách hàng (trạng thái CONFIRMED).
+        Gửi thông báo xác nhận đặt bàn tới cả khách hàng và nhà hàng
+        (trạng thái CONFIRMED).
 
         Args:
             customer: Người dùng (khách hàng) đặt bàn.
@@ -597,33 +950,58 @@ class EmailService:
         """
 
         customer_email = self._customer_email(customer)
+        restaurant_email = self._restaurant_email(branch)
 
         if not customer_email:
             logger.warning(
-                "Bỏ qua email xác nhận: customer %s không có email.",
+                "Bỏ qua email xác nhận cho khách: customer %s không có email.",
                 getattr(customer, "id", None),
             )
-            return
 
-        subject = f"Đã xác nhận đặt bàn: {branch.name} - #{reservation.id}"
+        if customer_email:
+            subject = f"Đã xác nhận đặt bàn: {branch.name} - #{reservation.id}"
 
-        body = self._base_html(
-            "Đặt bàn của bạn đã được xác nhận",
-            f"<p>Chào {self._escape(customer.full_name)}, "
-            "nhà hàng đã xác nhận đơn đặt bàn của bạn.</p>"
-            + self._branch_rows(branch)
-            + self._row("Mã đặt bàn", f"#{reservation.id}")
-            + self._row("Thời gian", self._format_datetime(reservation.reservation_time))
-            + self._row("Số khách", str(reservation.guest_count))
-            + self._table_row(reservation)
-            + self._row("Trạng thái", "✅ Đã xác nhận"),
-        )
+            body = self._base_html(
+                "Đặt bàn của bạn đã được xác nhận",
+                f"<p>Chào {self._escape(customer.full_name)}, "
+                "nhà hàng đã xác nhận đơn đặt bàn của bạn.</p>"
+                + self._branch_rows(branch)
+                + self._row("Mã đặt bàn", f"#{reservation.id}")
+                + self._row("Thời gian", self._format_datetime(reservation.reservation_time))
+                + self._row("Số khách", str(reservation.guest_count))
+                + self._table_row(reservation)
+                + self._row("Trạng thái", "✅ Đã xác nhận"),
+            )
 
-        await self._send(customer_email, subject, body)
+            await self._send(customer_email, subject, body)
+
+        if restaurant_email:
+            await self._send(
+                restaurant_email,
+                f"Đã xác nhận đơn đặt bàn #{reservation.id} - {branch.name}",
+                self._base_html(
+                    "Bạn đã xác nhận đơn đặt bàn",
+                    f"<p>Đơn đặt bàn #{reservation.id} của khách "
+                    f"{self._escape(customer.full_name)} đã được xác nhận.</p>"
+                    + self._branch_rows(branch)
+                    + self._row("Thời gian", self._format_datetime(reservation.reservation_time))
+                    + self._row("Số khách", str(reservation.guest_count))
+                    + self._table_row(reservation)
+                    + self._row("Khách hàng", customer.full_name)
+                    + self._row("Điện thoại", customer.phone or "—")
+                    + self._row("Trạng thái", "✅ Đã xác nhận"),
+                ),
+            )
+        else:
+            logger.warning(
+                "Bỏ qua email xác nhận cho nhà hàng: branch %s không có email chủ sở hữu.",
+                getattr(branch, "id", None),
+            )
 
     async def send_rejected(self, customer, branch, reservation, reason: str):
         """
-        Gửi thông báo nhà hàng từ chối đặt bàn tới khách hàng (trạng thái REJECTED).
+        Gửi thông báo từ chối đặt bàn tới cả khách hàng và nhà hàng
+        (trạng thái REJECTED).
 
         Args:
             customer: Người dùng (khách hàng) đặt bàn.
@@ -633,28 +1011,53 @@ class EmailService:
         """
 
         customer_email = self._customer_email(customer)
+        restaurant_email = self._restaurant_email(branch)
 
         if not customer_email:
             logger.warning(
-                "Bỏ qua email từ chối: customer %s không có email.",
+                "Bỏ qua email từ chối cho khách: customer %s không có email.",
                 getattr(customer, "id", None),
             )
-            return
 
-        subject = f"Từ chối đặt bàn: {branch.name} - #{reservation.id}"
+        if customer_email:
+            subject = f"Từ chối đặt bàn: {branch.name} - #{reservation.id}"
 
-        body = self._base_html(
-            "Đặt bàn của bạn bị từ chối",
-            f"<p>Chào {self._escape(customer.full_name)}, "
-            "rất tiếc nhà hàng không thể nhận đơn đặt bàn của bạn lúc này.</p>"
-            + self._branch_rows(branch)
-            + self._row("Mã đặt bàn", f"#{reservation.id}")
-            + self._row("Thời gian", self._format_datetime(reservation.reservation_time))
-            + self._row("Lý do từ chối", reason)
-            + self._row("Trạng thái", "❌ Đã từ chối"),
-        )
+            body = self._base_html(
+                "Đặt bàn của bạn bị từ chối",
+                f"<p>Chào {self._escape(customer.full_name)}, "
+                "rất tiếc nhà hàng không thể nhận đơn đặt bàn của bạn lúc này.</p>"
+                + self._branch_rows(branch)
+                + self._row("Mã đặt bàn", f"#{reservation.id}")
+                + self._row("Thời gian", self._format_datetime(reservation.reservation_time))
+                + self._row("Lý do từ chối", reason)
+                + self._row("Trạng thái", "❌ Đã từ chối"),
+            )
 
-        await self._send(customer_email, subject, body)
+            await self._send(customer_email, subject, body)
+
+        if restaurant_email:
+            await self._send(
+                restaurant_email,
+                f"Đã từ chối đơn đặt bàn #{reservation.id} - {branch.name}",
+                self._base_html(
+                    "Bạn đã từ chối đơn đặt bàn",
+                    f"<p>Đơn đặt bàn #{reservation.id} của khách "
+                    f"{self._escape(customer.full_name)} đã bị từ chối. "
+                    "Bàn đã được trả lại danh sách bàn trống.</p>"
+                    + self._branch_rows(branch)
+                    + self._row("Thời gian", self._format_datetime(reservation.reservation_time))
+                    + self._row("Số khách", str(reservation.guest_count))
+                    + self._row("Lý do từ chối", reason)
+                    + self._row("Khách hàng", customer.full_name)
+                    + self._row("Điện thoại", customer.phone or "—")
+                    + self._row("Trạng thái", "❌ Đã từ chối"),
+                ),
+            )
+        else:
+            logger.warning(
+                "Bỏ qua email từ chối cho nhà hàng: branch %s không có email chủ sở hữu.",
+                getattr(branch, "id", None),
+            )
 
     async def send_cancelled(self, customer, branch, reservation):
         """

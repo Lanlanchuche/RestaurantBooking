@@ -6,8 +6,11 @@ Các test này không gửi email thật: SMTP được mock hoặc thay bằng 
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import threading
 from datetime import datetime, timezone
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from types import SimpleNamespace
 
 import pytest
@@ -184,9 +187,18 @@ def test_send_confirmed_handles_missing_table_number(service, sent_messages):
         )
     )
 
-    assert len(sent_messages) == 1
-    assert "Nhà hàng sẽ sắp xếp khi xác nhận" in sent_messages[0]["html"]
-    assert "Đã xác nhận" in sent_messages[0]["html"]
+    assert [message["to"] for message in sent_messages] == [
+        "customer@example.com",
+        "owner@example.com",
+    ]
+
+    customer_mail, restaurant_mail = sent_messages
+
+    assert "Đã xác nhận đặt bàn" in customer_mail["subject"]
+    assert "Đã xác nhận đơn đặt bàn" in restaurant_mail["subject"]
+    assert "Nhà hàng sẽ sắp xếp khi xác nhận" in customer_mail["html"]
+    assert "Nhà hàng sẽ sắp xếp khi xác nhận" in restaurant_mail["html"]
+    assert "Đã xác nhận" in customer_mail["html"]
 
 
 def test_send_rejected_escapes_reason(service, sent_messages):
@@ -199,8 +211,45 @@ def test_send_rejected_escapes_reason(service, sent_messages):
         )
     )
 
-    assert len(sent_messages) == 1
-    assert "&lt;b&gt;Hết bàn&lt;/b&gt;" in sent_messages[0]["html"]
+    assert [message["to"] for message in sent_messages] == [
+        "customer@example.com",
+        "owner@example.com",
+    ]
+
+    for message in sent_messages:
+        assert "&lt;b&gt;Hết bàn&lt;/b&gt;" in message["html"]
+
+    assert "Từ chối đặt bàn" in sent_messages[0]["subject"]
+    assert "Đã từ chối đơn đặt bàn" in sent_messages[1]["subject"]
+
+
+def test_send_confirmed_skips_missing_restaurant_email(service, sent_messages):
+    """Thiếu email chủ nhà hàng vẫn gửi được email cho khách, không raise."""
+
+    asyncio.run(
+        service.send_confirmed(
+            make_customer(),
+            make_branch(owner_email=None),
+            make_reservation(),
+        )
+    )
+
+    assert [message["to"] for message in sent_messages] == ["customer@example.com"]
+
+
+def test_send_rejected_skips_missing_customer_email(service, sent_messages):
+    """Thiếu email khách vẫn gửi được email cho nhà hàng, không raise."""
+
+    asyncio.run(
+        service.send_rejected(
+            make_customer(email=None),
+            make_branch(),
+            make_reservation(),
+            "Nhà hàng kín bàn",
+        )
+    )
+
+    assert [message["to"] for message in sent_messages] == ["owner@example.com"]
 
 
 def test_send_cancelled_sends_distinct_emails(service, sent_messages):
@@ -216,6 +265,220 @@ def test_send_cancelled_sends_distinct_emails(service, sent_messages):
     assert "Đã hủy đặt bàn" in sent_messages[0]["subject"]
     assert "Khách đã hủy đặt bàn" in sent_messages[1]["subject"]
     assert "Khách hàng đã hủy" in sent_messages[1]["html"]
+
+
+# ----------------------------------------------------------------------
+# HTTPS API PROVIDERS (RENDER-FRIENDLY)
+# ----------------------------------------------------------------------
+
+
+def clear_email_env(monkeypatch):
+    """Xoá toàn bộ cấu hình email để test chế độ auto."""
+
+    for name in (
+        "EMAIL_PROVIDER",
+        "EMAIL_FROM",
+        "EMAIL_TIMEOUT",
+        "EMAIL_MAX_RETRIES",
+        "EMAIL_RETRY_DELAY",
+        "RESEND_API_KEY",
+        "SENDGRID_API_KEY",
+        "BREVO_API_KEY",
+        "SMTP_USER",
+        "SMTP_PASSWORD",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+
+def test_resolve_provider_prefers_https_api(monkeypatch):
+    clear_email_env(monkeypatch)
+    monkeypatch.setenv("SMTP_USER", "user@example.com")
+    monkeypatch.setenv("SMTP_PASSWORD", "secret")
+    monkeypatch.setenv("BREVO_API_KEY", "brevo-key")
+    monkeypatch.setenv("RESEND_API_KEY", "resend-key")
+
+    # auto: ưu tiên resend rồi mới tới sendgrid/brevo/smtp.
+    assert email_module._resolve_provider() == "resend"
+
+    monkeypatch.delenv("RESEND_API_KEY")
+    assert email_module._resolve_provider() == "brevo"
+
+    monkeypatch.delenv("BREVO_API_KEY")
+    assert email_module._resolve_provider() == "smtp"
+
+    monkeypatch.delenv("SMTP_USER")
+    monkeypatch.delenv("SMTP_PASSWORD")
+    assert email_module._resolve_provider() == "mock"
+
+
+def test_send_via_brevo_builds_expected_payload(monkeypatch):
+    clear_email_env(monkeypatch)
+    monkeypatch.setenv("EMAIL_PROVIDER", "brevo")
+    monkeypatch.setenv("BREVO_API_KEY", "brevo-key")
+    monkeypatch.setenv("EMAIL_FROM", "TableReserve <sender@example.com>")
+
+    captured = {}
+
+    def fake_post_json(url, headers, payload, timeout):
+        captured.update(
+            {
+                "url": url,
+                "headers": headers,
+                "payload": payload,
+                "timeout": timeout,
+            }
+        )
+
+    monkeypatch.setattr(email_module, "_post_json", fake_post_json)
+
+    config = email_module._email_config()
+
+    email_module._send_via_http(
+        "brevo",
+        config,
+        "customer@example.com",
+        "Tiêu đề",
+        "<p>Xin chào</p>",
+        "Xin chào",
+    )
+
+    assert captured["url"] == "https://api.brevo.com/v3/smtp/email"
+    assert captured["headers"]["api-key"] == "brevo-key"
+    assert captured["payload"]["sender"] == {
+        "email": "sender@example.com",
+        "name": "TableReserve",
+    }
+    assert captured["payload"]["to"] == [{"email": "customer@example.com"}]
+    assert captured["payload"]["htmlContent"] == "<p>Xin chào</p>"
+    assert captured["payload"]["textContent"] == "Xin chào"
+
+
+def test_send_sync_does_not_retry_on_client_error(monkeypatch, caplog):
+    clear_email_env(monkeypatch)
+    monkeypatch.setenv("EMAIL_PROVIDER", "resend")
+    monkeypatch.setenv("RESEND_API_KEY", "resend-key")
+    monkeypatch.setenv("EMAIL_FROM", "sender@example.com")
+    monkeypatch.setenv("EMAIL_MAX_RETRIES", "3")
+    monkeypatch.setenv("EMAIL_RETRY_DELAY", "0")
+
+    attempts = []
+
+    def fake_send_via_http(*args, **kwargs):
+        attempts.append(1)
+        raise email_module.EmailDeliveryError(422, '{"message":"invalid from"}')
+
+    monkeypatch.setattr(email_module, "_send_via_http", fake_send_via_http)
+
+    with caplog.at_level(
+        logging.ERROR,
+        logger="backend.services.email_service",
+    ):
+        email_module.email_service._send_sync(
+            "customer@example.com",
+            "Subject",
+            "<p>Hello</p>",
+            "Hello",
+        )
+
+    # Lỗi 4xx (sai sender/API key) không thử lại.
+    assert len(attempts) == 1
+    assert "invalid from" in caplog.text
+
+
+def test_send_sync_retries_on_server_error_then_succeeds(monkeypatch):
+    clear_email_env(monkeypatch)
+    monkeypatch.setenv("EMAIL_PROVIDER", "sendgrid")
+    monkeypatch.setenv("SENDGRID_API_KEY", "sg-key")
+    monkeypatch.setenv("EMAIL_FROM", "sender@example.com")
+    monkeypatch.setenv("EMAIL_MAX_RETRIES", "3")
+    monkeypatch.setenv("EMAIL_RETRY_DELAY", "0")
+
+    attempts = {"count": 0}
+
+    def fake_send_via_http(*args, **kwargs):
+        attempts["count"] += 1
+
+        if attempts["count"] < 3:
+            raise email_module.EmailDeliveryError(503, "service unavailable")
+
+    monkeypatch.setattr(email_module, "_send_via_http", fake_send_via_http)
+
+    email_module.email_service._send_sync(
+        "customer@example.com",
+        "Subject",
+        "<p>Hello</p>",
+        "Hello",
+    )
+
+    assert attempts["count"] == 3
+
+
+def test_send_sync_posts_json_to_http_provider(monkeypatch):
+    clear_email_env(monkeypatch)
+    monkeypatch.setenv("EMAIL_PROVIDER", "brevo")
+    monkeypatch.setenv("BREVO_API_KEY", "brevo-key")
+    monkeypatch.setenv("EMAIL_FROM", "TableReserve <sender@example.com>")
+    monkeypatch.setenv("EMAIL_MAX_RETRIES", "1")
+
+    received = {}
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            length = int(self.headers.get("Content-Length", 0))
+            received["path"] = self.path
+            received["api-key"] = self.headers.get("api-key")
+            received["body"] = json.loads(self.rfile.read(length))
+            self.send_response(202)
+            self.end_headers()
+            self.wfile.write(b'{"messageId":"abc"}')
+
+        def log_message(self, *args):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        port = server.server_address[1]
+        monkeypatch.setitem(
+            email_module.HTTP_API_ENDPOINTS,
+            "brevo",
+            f"http://127.0.0.1:{port}/v3/smtp/email",
+        )
+
+        email_module.email_service._send_sync(
+            "customer@example.com",
+            "Tiêu đề",
+            "<p>Xin chào</p>",
+            "Xin chào",
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+    assert received["path"] == "/v3/smtp/email"
+    assert received["api-key"] == "brevo-key"
+    assert received["body"]["to"] == [{"email": "customer@example.com"}]
+    assert received["body"]["subject"] == "Tiêu đề"
+    assert received["body"]["htmlContent"] == "<p>Xin chào</p>"
+
+
+def test_log_email_status_warns_on_render_smtp(monkeypatch, caplog):
+    clear_email_env(monkeypatch)
+    monkeypatch.setenv("EMAIL_PROVIDER", "smtp")
+    monkeypatch.setenv("SMTP_USER", "user@example.com")
+    monkeypatch.setenv("SMTP_PASSWORD", "secret")
+    monkeypatch.setenv("RENDER", "true")
+
+    with caplog.at_level(
+        logging.WARNING,
+        logger="backend.services.email_service",
+    ):
+        email_module.log_email_status()
+
+    assert "Render chặn outbound" in caplog.text
 
 
 # ----------------------------------------------------------------------
