@@ -6,7 +6,11 @@ cho phép đẩy sự kiện đặt bàn mới (push notifications) lên dashboa
 """
 
 from typing import Dict, List
+import logging
+
 from fastapi import WebSocket
+
+logger = logging.getLogger(__name__)
 
 class ConnectionManager:
     """
@@ -44,6 +48,13 @@ class ConnectionManager:
             if not self._connections[restaurant_id]:
                 del self._connections[restaurant_id]
 
+    def connection_count(self, restaurant_id: int) -> int:
+        """
+        Đếm số kết nối đang hoạt động của một nhà hàng.
+        Hữu ích cho log và test.
+        """
+        return len(self._connections.get(restaurant_id, []))
+
     async def broadcast_to_restaurant(self, restaurant_id: int, payload: dict):
         """
         Gửi dữ liệu JSON tới toàn bộ các client đang kết nối thuộc về một nhà hàng.
@@ -53,16 +64,27 @@ class ConnectionManager:
             restaurant_id (int): ID của nhà hàng cần gửi thông báo.
             payload (dict): Dữ liệu dạng từ điển (sẽ được parse sang JSON) cần gửi đi.
         """
-        if restaurant_id in self._connections:
-            dead_connections = []
-            for connection in self._connections[restaurant_id]:
-                try:
-                    await connection.send_json(payload)
-                except Exception:
-                    dead_connections.append(connection)
-            
-            # Clean up dead connections
-            for dead in dead_connections:
-                self.disconnect(dead, restaurant_id)
+        if restaurant_id not in self._connections:
+            return
+
+        # Duyệt trên bản sao: trong lúc await send_json(), một coroutine
+        # khác (ngắt kết nối, broadcast khác) có thể sửa danh sách thật
+        # và làm phát sinh lỗi "list changed size during iteration".
+        connections = list(self._connections[restaurant_id])
+        dead_connections = []
+        for connection in connections:
+            try:
+                await connection.send_json(payload)
+            except Exception as exc:
+                logger.debug(
+                    "Không gửi được thông báo WebSocket cho restaurant %s: %s",
+                    restaurant_id,
+                    exc,
+                )
+                dead_connections.append(connection)
+
+        # Clean up dead connections
+        for dead in dead_connections:
+            self.disconnect(dead, restaurant_id)
 
 manager = ConnectionManager()

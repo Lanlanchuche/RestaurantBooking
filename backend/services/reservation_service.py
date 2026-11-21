@@ -11,7 +11,9 @@ Chức năng:
 - Lấy lịch sử đặt chỗ
 
 Sử dụng asyncio.Lock theo từng branch để hạn chế race condition
-trong cùng một process.
+trong cùng một process, cộng thêm các UPDATE có điều kiện
+(WHERE available_tables > 0, WHERE status IN (...)) để việc cấp phát
+và hoàn trả bàn vẫn đúng khi có nhiều process/instance cùng chạy.
 """
 
 from __future__ import annotations
@@ -42,6 +44,12 @@ logger = logging.getLogger(__name__)
 
 MIN_GUEST_COUNT = 1
 CANCELLATION_LIMIT_HOURS = 24
+
+# Những trạng thái đang "giữ" một bàn của chi nhánh.
+TABLE_HOLD_STATUSES = (
+    ReservationStatus.PENDING,
+    ReservationStatus.CONFIRMED,
+)
 
 
 
@@ -171,6 +179,131 @@ def _validate_can_return_table(branch: Branch) -> None:
 
 
 # =========================================================
+# NGUYÊN TỬ HÓA (RACE CONDITION)
+# =========================================================
+
+def _count_table_holding_reservations(db: Session, branch_id: int) -> int:
+    """
+    Đếm số đặt bàn còn đang giữ bàn của một chi nhánh
+    (PENDING hoặc CONFIRMED).
+    """
+
+    return (
+        db.query(Reservation)
+        .filter(
+            Reservation.branch_id == branch_id,
+            Reservation.status.in_(TABLE_HOLD_STATUSES),
+        )
+        .count()
+    )
+
+
+def _sync_available_tables(db: Session, branch: Branch) -> None:
+    """
+    Đồng bộ bộ đếm available_tables với số đặt bàn thực trong database.
+
+    available_tables chỉ là bộ đếm nhanh. Nếu nó lệch (nhiều process hoặc
+    nhiều instance cùng ghi, dữ liệu seed, hoặc lỗi trước đó), phải chỉnh
+    theo database trước khi cấp phát hay hoàn trả bàn. Nếu không, chi nhánh
+    có thể báo "hết bàn" sai hoặc bán vượt số bàn thật có.
+    """
+
+    holding = _count_table_holding_reservations(db, branch.id)
+    expected = max(0, branch.total_tables - holding)
+
+    if expected != branch.available_tables:
+        logger.warning(
+            "Branch %s counter out of sync: available_tables=%s, "
+            "reservations_holding_tables=%s, total_tables=%s. "
+            "Đồng bộ lại theo database.",
+            branch.id,
+            branch.available_tables,
+            holding,
+            branch.total_tables,
+        )
+
+        branch.available_tables = expected
+
+        # Phải flush ngay: _claim_table dùng UPDATE ... WHERE available_tables > 0,
+        # là lệnh SQL nên chỉ nhìn thấy giá trị đã ghi xuống database.
+        # Nếu giá trị sửa chữa còn nằm trong session thì lệnh đó tưởng nhầm
+        # là chi nhánh đã hết bàn.
+        db.flush()
+
+
+def _claim_table(db: Session, branch: Branch) -> None:
+    """
+    Chiếm một bàn của chi nhánh một cách nguyên tử.
+
+    UPDATE ... WHERE available_tables > 0 đảm bảo hai request cùng tranh
+    chiếc bàn cuối cùng thì chỉ một request cập nhật được dòng. asyncio.Lock
+    chỉ có tác dụng trong một process, còn lệnh này đúng với mọi số lượng
+    instance cùng truy cập database (Render chạy nhiều worker/instance).
+    """
+
+    updated_rows = (
+        db.query(Branch)
+        .filter(
+            Branch.id == branch.id,
+            Branch.available_tables > 0,
+        )
+        .update(
+            {Branch.available_tables: Branch.available_tables - 1},
+            synchronize_session=False,
+        )
+    )
+
+    if updated_rows == 0:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Xin lỗi, chi nhánh này đã hết bàn trống.",
+        )
+
+    db.refresh(branch)
+
+
+def _transition_reservation(
+    db: Session,
+    reservation_id: int,
+    allowed_statuses: tuple[ReservationStatus, ...],
+    new_status: ReservationStatus,
+    extra_values: dict | None = None,
+    error_detail: str = "Đơn đặt bàn này đã được xử lý.",
+) -> None:
+    """
+    Chuyển trạng thái đặt bàn một cách nguyên tử.
+
+    UPDATE chỉ chạy khi trạng thái trong database vẫn nằm trong
+    allowed_statuses. Nhờ vậy hai request cùng hủy (hoặc một người hủy,
+    một người từ chối) chỉ có duy nhất một request thành công, và bàn
+    chỉ được hoàn trả đúng một lần.
+    """
+
+    values = dict(extra_values or {})
+    values[Reservation.status] = new_status
+    values[Reservation.updated_at] = _utc_now()
+
+    updated_rows = (
+        db.query(Reservation)
+        .filter(
+            Reservation.id == reservation_id,
+            Reservation.status.in_(allowed_statuses),
+        )
+        .update(values, synchronize_session=False)
+    )
+
+    if updated_rows == 0:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_detail,
+        )
+
+
+# =========================================================
 # EXTERNAL SERVICES
 # =========================================================
 
@@ -205,6 +338,85 @@ def _load_notification_context(
         )
         .filter(Reservation.id == reservation_id)
         .first()
+    )
+
+
+def _iso(value: datetime | None) -> str | None:
+    """Chuyển datetime sang chuỗi ISO để gửi qua WebSocket."""
+
+    if value is None:
+        return None
+
+    return value.isoformat()
+
+
+def _reservation_event_data(notification: Reservation) -> dict:
+    """
+    Tạo dữ liệu đặt bàn cho thông báo realtime.
+
+    Dashboard cần đủ thông tin (tên khách, số khách, tên chi nhánh,
+    trạng thái...) để hiển thị ngay mà không phải gọi thêm API.
+    """
+
+    customer = notification.customer
+    branch = notification.branch
+
+    return {
+        "id": notification.id,
+        "status": notification.status.value if notification.status else None,
+        "guest_count": notification.guest_count,
+        "table_number": notification.table_number,
+        "reservation_time": _iso(notification.reservation_time),
+        "special_request": notification.special_request,
+        "rejection_reason": notification.rejection_reason,
+        "created_at": _iso(notification.created_at),
+        "customer_name": customer.full_name if customer else None,
+        "customer_phone": customer.phone if customer else None,
+        "branch_id": notification.branch_id,
+        "branch_name": branch.name if branch else None,
+    }
+
+
+def _broadcast_reservation_event(
+    notification: Reservation,
+    event: str,
+) -> None:
+    """
+    Gửi thông báo realtime tới dashboard của nhà hàng.
+
+    Args:
+        notification (Reservation): Reservation đã eager-load đủ
+            customer/branch/restaurant.
+        event (str): "created" hoặc "updated".
+
+    Payload gửi đi chứa cả `type` lẫn `event` vì dashboard.js khớp tin
+    nhắn theo cả hai trường. Trước đây backend chỉ gửi
+    {"event": "new_reservation", "data": <id>} nên dashboard không bao
+    giờ coi đó là đơn mới, và cũng không đủ dữ liệu để hiển thị.
+    """
+
+    if notification.branch is None:
+        return
+
+    if event == "created":
+        message = {
+            "type": "new_reservation",
+            "event": "RESERVATION_CREATED",
+        }
+    else:
+        message = {
+            "type": "reservation_updated",
+            "event": "RESERVATION_UPDATED",
+        }
+
+    message["data"] = _reservation_event_data(notification)
+
+    _create_external_task(
+        "broadcast_reservation",
+        manager.broadcast_to_restaurant(
+            notification.branch.restaurant_id,
+            message,
+        ),
     )
 
 
@@ -321,6 +533,8 @@ async def create_reservation(
                 detail="Chi nhánh hiện không hoạt động.",
             )
 
+        _sync_available_tables(db, branch)
+
         _validate_branch_availability(branch)
 
         # -------------------------------------------------
@@ -373,10 +587,10 @@ async def create_reservation(
         )
 
         # -------------------------------------------------
-        # 7. Decrease available tables
+        # 7. Decrease available tables (nguyên tử)
         # -------------------------------------------------
 
-        branch.available_tables -= 1
+        _claim_table(db, branch)
 
         db.add(reservation)
 
@@ -430,16 +644,7 @@ async def create_reservation(
                 ),
             )
 
-            _create_external_task(
-                "broadcast_new_reservation",
-                manager.broadcast_to_restaurant(
-                    notification.branch.restaurant_id,
-                    {
-                        "event": "new_reservation",
-                        "data": reservation.id,
-                    },
-                ),
-            )
+            _broadcast_reservation_event(notification, "created")
 
         return reservation
 
@@ -588,19 +793,27 @@ async def cancel_reservation(
                 detail="Không tìm thấy chi nhánh của đặt bàn.",
             )
 
+        _sync_available_tables(db, branch)
+
         _validate_can_return_table(branch)
 
         # -------------------------------------------------
-        # 8. Return table
+        # 8. Claim status transition (nguyên tử)
+        # -------------------------------------------------
+
+        _transition_reservation(
+            db,
+            reservation_id,
+            TABLE_HOLD_STATUSES,
+            ReservationStatus.CANCELLED,
+            error_detail="Đơn đặt bàn này đã được xử lý hoặc đã hủy.",
+        )
+
+        # -------------------------------------------------
+        # 9. Return table
         # -------------------------------------------------
 
         branch.available_tables += 1
-
-        # -------------------------------------------------
-        # 9. Change status
-        # -------------------------------------------------
-
-        reservation.status = ReservationStatus.CANCELLED
 
         # -------------------------------------------------
         # 10. Commit
@@ -649,6 +862,9 @@ async def cancel_reservation(
                     notification,
                 ),
             )
+
+        if notification is not None:
+            _broadcast_reservation_event(notification, "updated")
 
         return reservation
 
@@ -722,10 +938,16 @@ async def confirm_reservation(
             )
 
         # -------------------------------------------------
-        # 5. Change status
+        # 5. Change status (nguyên tử)
         # -------------------------------------------------
 
-        reservation.status = ReservationStatus.CONFIRMED
+        _transition_reservation(
+            db,
+            reservation_id,
+            (ReservationStatus.PENDING,),
+            ReservationStatus.CONFIRMED,
+            error_detail="Chỉ có thể xác nhận đơn đang PENDING.",
+        )
 
         # -------------------------------------------------
         # 6. Commit
@@ -772,6 +994,9 @@ async def confirm_reservation(
                     notification,
                 ),
             )
+
+        if notification is not None:
+            _broadcast_reservation_event(notification, "updated")
 
         return reservation
 
@@ -878,20 +1103,28 @@ async def reject_reservation(
                 detail="Không tìm thấy chi nhánh của đặt bàn.",
             )
 
+        _sync_available_tables(db, branch)
+
         _validate_can_return_table(branch)
 
         # -------------------------------------------------
-        # 7. Return table
+        # 7. Claim status transition (nguyên tử)
+        # -------------------------------------------------
+
+        _transition_reservation(
+            db,
+            reservation_id,
+            (ReservationStatus.PENDING,),
+            ReservationStatus.REJECTED,
+            extra_values={Reservation.rejection_reason: reason},
+            error_detail="Chỉ có thể từ chối đơn đang PENDING.",
+        )
+
+        # -------------------------------------------------
+        # 8. Return table
         # -------------------------------------------------
 
         branch.available_tables += 1
-
-        # -------------------------------------------------
-        # 8. Update reservation
-        # -------------------------------------------------
-
-        reservation.status = ReservationStatus.REJECTED
-        reservation.rejection_reason = reason
 
         # -------------------------------------------------
         # 9. Commit
@@ -941,6 +1174,9 @@ async def reject_reservation(
                     reason,
                 ),
             )
+
+        if notification is not None:
+            _broadcast_reservation_event(notification, "updated")
 
         return reservation
 

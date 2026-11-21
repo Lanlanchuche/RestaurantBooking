@@ -19,6 +19,11 @@
 const RECONNECT_DELAY_MS = 5000;
 const PING_INTERVAL_MS = 25000;
 
+// Mã đóng kết nối backend trả về khi xác thực WebSocket thất bại
+// (xem backend/routers/websocket_router.py).
+const WS_CLOSE_UNAUTHORIZED = 4401;
+const WS_CLOSE_FORBIDDEN = 4403;
+
 let _ws = null;
 let _reconnectTimer = null;
 let _pingTimer = null;
@@ -133,8 +138,9 @@ function playChimeSound() {
 /**
  * Cập nhật giao diện trạng thái kết nối WebSocket
  * @param {'connected'|'reconnecting'|'disconnected'} status
+ * @param {string} [reason] - Lý do hiển thị khi ngắt kết nối (thay chữ "Ngoại tuyến (Demo)")
  */
-function _setWsStatus(status) {
+function _setWsStatus(status, reason) {
     const badge = document.getElementById("ws-status-badge");
     const textEl = document.getElementById("ws-status-text");
     if (!badge || !textEl) return;
@@ -151,8 +157,10 @@ function _setWsStatus(status) {
         badge.title = "Đang thử kết nối lại máy chủ WebSocket...";
     } else {
         badge.classList.add("disconnected");
-        textEl.textContent = "Ngoại tuyến (Demo)";
-        badge.title = "Không kết nối WebSocket server. Dữ liệu đang chạy ở chế độ offline demo.";
+        textEl.textContent = reason || "Ngoại tuyến (Demo)";
+        badge.title =
+            reason ||
+            "Không kết nối WebSocket server. Dữ liệu đang chạy ở chế độ offline demo.";
     }
 }
 
@@ -168,6 +176,16 @@ function _connectWS(onNewReservation) {
     if (_pingTimer) {
         clearInterval(_pingTimer);
         _pingTimer = null;
+    }
+
+    // Backend xác thực WebSocket bằng JWT và kiểm tra nhà hàng có thuộc
+    // về tài khoản này hay không. Không có token thì kết nối chắc chắn bị
+    // từ chối (mã 4401) -> không cần thử lại vòng lặp vô hạn.
+    const token = typeof getToken === "function" ? getToken() : localStorage.getItem("token");
+
+    if (!token) {
+        _setWsStatus("disconnected", "Chưa đăng nhập - không có realtime");
+        return;
     }
 
     _setWsStatus("reconnecting");
@@ -194,11 +212,25 @@ function _connectWS(onNewReservation) {
         _ws.onmessage = (event) => {
             try {
                 const payload = JSON.parse(event.data);
-                if (payload.type === "new_reservation" || payload.event === "RESERVATION_CREATED") {
-                    const resData = payload.data || payload.reservation || payload;
+                const type = payload.type || payload.event;
+
+                // Phản hồi keepalive: không phải dữ liệu đặt bàn.
+                if (type === "pong") return;
+
+                const isCreated = payload.type === "new_reservation" || payload.event === "RESERVATION_CREATED";
+                const isUpdated = payload.type === "reservation_updated" || payload.event === "RESERVATION_UPDATED";
+
+                if (!isCreated && !isUpdated) return;
+
+                // Server gửi đối tượng đặt bàn đầy đủ trong payload.data.
+                const resData = payload.data || payload.reservation || payload;
+
+                if (isCreated) {
                     if (typeof onNewReservation === "function") {
                         onNewReservation(resData);
                     }
+                } else {
+                    handleReservationUpdated(resData);
                 }
             } catch (err) {
                 console.warn("[WS] Parse message error:", err);
@@ -209,12 +241,38 @@ function _connectWS(onNewReservation) {
             _setWsStatus("disconnected");
         };
 
-        _ws.onclose = () => {
-            _setWsStatus("disconnected");
+        _ws.onclose = (event) => {
             if (_pingTimer) {
                 clearInterval(_pingTimer);
                 _pingTimer = null;
             }
+
+            // 4401/4403: token hết hạn hoặc nhà hàng không thuộc về tài khoản.
+            // Kết nối lại cũng vẫn bị từ chối, nên dừng hẳn và báo rõ lý do
+            // thay vì cứ 5 giây gọi lại một lần.
+            if (event.code === WS_CLOSE_UNAUTHORIZED || event.code === WS_CLOSE_FORBIDDEN) {
+                _setWsStatus(
+                    "disconnected",
+                    event.code === WS_CLOSE_FORBIDDEN
+                        ? "Không có quyền xem nhà hàng này"
+                        : "Phiên đăng nhập đã hết hạn",
+                );
+
+                if (typeof showToast === "function") {
+                    showToast(
+                        event.reason ||
+                            "Không thể kết nối realtime. Vui lòng đăng nhập lại.",
+                        "danger",
+                        5000,
+                    );
+                }
+
+                _ws = null;
+                return;
+            }
+
+            _setWsStatus("disconnected");
+
             // Reconnect sau 5s thay vì ngay lập tức để tránh bão kết nối (theo convention)
             _reconnectTimer = setTimeout(() => {
                 _connectWS(onNewReservation);
@@ -514,6 +572,33 @@ function renderFilteredRows() {
 
     if (emptyState) emptyState.hidden = true;
     tbody.innerHTML = filtered.map(buildReservationRow).join("");
+}
+
+/**
+ * Cập nhật trạng thái một đơn đã có trong bảng khi server đẩy
+ * sự kiện reservation_updated (khách hủy, đơn bị từ chối, đơn được xác nhận).
+ * @param {Object} data - Đối tượng đặt bàn đã cập nhật
+ */
+function handleReservationUpdated(data) {
+    if (!data || !data.id) return;
+
+    const index = _reservations.findIndex((r) => String(r.id) === String(data.id));
+
+    // Đơn không nằm trong danh sách đang hiển thị (khác chi nhánh, khác bộ lọc) thì bỏ qua.
+    if (index < 0) return;
+
+    _reservations[index] = { ..._reservations[index], ...data };
+
+    saveReservationsLocally(_reservations);
+    renderTableAndStats();
+
+    if (data.status === "CANCELLED") {
+        showToast(`🚫 Khách đã hủy đơn đặt bàn #${data.id}`, "danger", 4500);
+    } else if (data.status === "REJECTED") {
+        showToast(`⚠️ Đơn #${data.id} đã bị nhà hàng từ chối`, "danger", 4500);
+    } else if (data.status === "CONFIRMED") {
+        showToast(`✅ Đã xác nhận đơn #${data.id}`, "success", 3000);
+    }
 }
 
 /**

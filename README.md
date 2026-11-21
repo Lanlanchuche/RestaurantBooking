@@ -57,7 +57,7 @@ RestaurantBooking/
 │   │   └── branches.html        # Quản lý chi nhánh (thêm/sửa/xóa, geocode)
 │   ├── css/                     # style.css, booking.css...
 │   └── js/                      # api.js, auth.js, book.js, history.js, dashboard.js...
-├── tests/                       # Pytest (email_service)
+├── tests/                       # Pytest (email_service, reservation_service, websocket)
 ├── docs/                        # Tài liệu: use case, scope, phases, conventions...
 ├── scripts/send_test_email.py   # Script test gửi email
 ├── seed_hanoi.py                # Nạp dữ liệu mẫu 10 nhà hàng / 30 chi nhánh Hà Nội
@@ -190,6 +190,10 @@ Tất cả prefix `/api`, trả JSON. Đăng nhập qua `Authorization: Bearer <
 ### WebSocket
 `{WS_BASE}/ws/restaurant/{restaurant_id}?token=<JWT>` — nhận sự kiện đặt bàn mới theo thời gian thực trên dashboard nhà hàng (giữ kết nối bằng `ping`/`pong`). Local: `ws://localhost:8000/ws/...`; khi deploy qua Render: `wss://restaurantbooking-flx9.onrender.com/ws/...` (đường dẫn WebSocket **không** có prefix `/api`).
 
+- **Xác thực**: JWT của chủ nhà hàng bắt buộc và được kiểm tra *trước* khi chấp nhận kết nối; tài khoản `CUSTOMER` hoặc `restaurant_id` không thuộc về tài khoản đó sẽ bị từ chối (mã đóng `4401` — thiếu/sai token, `4403` — không có quyền).
+- **Keepalive**: client gửi `ping` (chuỗi `"ping"` hoặc JSON `{"type": "ping"}`), server trả `{"type": "pong"}`. Nếu quá `WS_IDLE_TIMEOUT_SECONDS` (mặc định 120s) không nhận được tin nhắn, server chủ động đóng để không giữ kết nối chết.
+- **Sự kiện đẩy đi**: `{"type": "new_reservation", "event": "RESERVATION_CREATED", "data": {...}}` khi khách đặt bàn và `{"type": "reservation_updated", "event": "RESERVATION_UPDATED", "data": {...}}` khi khách hủy / chủ quán duyệt hoặc từ chối. `data` là đối tượng đặt bàn đầy đủ (tên khách, SĐT, số khách, trạng thái, tên chi nhánh) nên dashboard cập nhật ngay không cần gọi lại API.
+
 Tài liệu Swagger đầy đủ: `http://localhost:8000/docs`.
 
 ---
@@ -200,6 +204,7 @@ Tài liệu Swagger đầy đủ: `http://localhost:8000/docs`.
 - **Hủy (BR-01)**: chỉ hủy được đơn `PENDING`/`CONFIRMED` khi còn **≥ 24 giờ** trước giờ hẹn; bàn trống được hoàn lại.
 - **Tìm chi nhánh gần nhất**: địa chỉ khách nhập được geocode phía client (Nominatim → Photon, với chuẩn hoá địa chỉ tiếng Việt và truy vấn giảm dần độ cụ thể), sau đó tính khoảng cách đường bộ bằng Dijkstra trên đồ thị OSM trong bán kính 10 km (cache `.pkl` tại `backend/cache/osm_graphs/`), tự động fallback khoảng cách Haversine khi đồ thị OSM không khả dụng.
 - **Email thông báo**: gửi cho **cả khách hàng và chủ nhà hàng** ở mỗi bước — khi tạo đặt bàn (`PENDING`), khi chủ quán duyệt (`CONFIRMED`), khi từ chối (`REJECTED`, kèm lý do), khi khách hủy (`CANCELLED`). Chưa cấu hình email → in ra log (chế độ mock) để phục vụ dev.
+- **Chống tranh chấp bàn (race condition)**: cấp phát và hoàn trả bàn dùng `UPDATE` có điều kiện (`WHERE available_tables > 0`, `WHERE status IN (...)`) nên đúng với mọi số lượng process/instance cùng truy cập DB; `asyncio.Lock` chỉ là tối ưu trong một process. Hai request cùng tranh chiếc bàn cuối → một thành công, một nhận `409`. Khách hủy và chủ quán từ chối cùng lúc → bàn chỉ được hoàn trả **một lần**. `available_tables` được coi là bộ đếm nhanh và luôn đồng bộ lại theo số đơn `PENDING`/`CONFIRMED` thực tế trước khi cấp phát/hoàn trả.
 
 ---
 
@@ -210,6 +215,8 @@ pytest tests/
 ```
 
 - `tests/test_email_service.py` — kiểm thử email service (mock SMTP và HTTPS API, định dạng, retry, gửi cho cả khách và nhà hàng).
+- `tests/test_reservation_service.py` — kiểm thử cấp phát/hoàn trả bàn: không bán vượt số bàn thật (10 request đồng thời vào chi nhánh 3 bàn → 3 thành công, 7 nhận `409`), bàn chỉ hoàn trả một lần, bộ đếm lệch được đồng bộ lại theo DB, payload WebSocket khớp với `dashboard.js`.
+- `tests/test_websocket.py` — kiểm thử xác thực WebSocket (`4401`/`4403`, chặn theo dõi nhà hàng khác), trả `pong` cho cả hai định dạng `ping`, và `ConnectionManager` dọn kết nối chết.
 - `scripts/send_test_email.py` — script gửi email thật thủ công để kiểm tra cấu hình (truyền 2 email để kiểm tra cả luồng khách + nhà hàng).
 
 ---
@@ -227,6 +234,8 @@ pytest tests/
 | `SMTP_USE_SSL` | `true` cho cổng 465 |
 | `SMTP_MAX_RETRIES` / `SMTP_RETRY_DELAY` | Retry lỗi SMTP tạm thời (backoff lũy thừa) |
 | `DATABASE_URL` | Chuỗi kết nối DB (mặc định `sqlite:///./tablereserve.db`) |
+| `JWT_SECRET_KEY` | Khóa ký JWT dùng cho đăng nhập **và** xác thực WebSocket dashboard — bắt buộc đặt giá trị ngẫu nhiên khi deploy |
+| `WS_IDLE_TIMEOUT_SECONDS` | Sau bao lâu không nhận `ping` thì server đóng kết nối WebSocket (mặc định `120`) |
 | `GEMINI_API_KEY` | Placeholder cho tính năng AI tương lai (chưa dùng) |
 
 `.env` đã nằm trong `.gitignore` — không commit thông tin bí mật.
