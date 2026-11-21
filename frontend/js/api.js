@@ -1,5 +1,31 @@
-const API_BASE = "https://restaurantbooking-flx9.onrender.com/";
-const WS_BASE = "ws://localhost:8000";
+const API_BASE = "https://restaurantbooking-flx9.onrender.com";
+const WS_BASE = "wss://restaurantbooking-flx9.onrender.com";
+
+// Toàn bộ endpoint của backend nằm dưới tiền tố /api.
+const API_PREFIX = "/api";
+
+// Ghép base + endpoint, tránh lặp hoặc thiếu dấu "/" ở giữa.
+function joinUrl(base, path) {
+    return `${String(base).replace(/\/+$/, "")}/${String(path).replace(/^\/+/, "")}`;
+}
+
+// Dựng URL đầy đủ: tự thêm /api nếu nơi gọi chưa truyền.
+function buildApiUrl(endpoint) {
+    const raw = String(endpoint || "");
+    const path = raw.startsWith("/") ? raw : `/${raw}`;
+    const fullPath =
+        path === API_PREFIX || path.startsWith(`${API_PREFIX}/`) ? path : `${API_PREFIX}${path}`;
+    return joinUrl(API_BASE, fullPath);
+}
+
+// WebSocket chỉ nhận ws:// hoặc wss://, nên phải đổi http(s):// -> ws(s)://
+function toWebSocketUrl(url) {
+    return String(url)
+        .trim()
+        .replace(/^https:\/\//i, "wss://")
+        .replace(/^http:\/\//i, "ws://")
+        .replace(/\/+$/, "");
+}
 
 function parseApiError(payload, fallback) {
     if (!payload) {
@@ -37,7 +63,7 @@ const api = {
 
         let response;
         try {
-            response = await fetch(`${API_BASE}${endpoint}`, {
+            response = await fetch(buildApiUrl(endpoint), {
                 ...rest,
                 headers,
                 body: body && typeof body !== "string" ? JSON.stringify(body) : body,
@@ -95,8 +121,9 @@ const api = {
 
     wsUrl(path) {
         const token = typeof getToken === "function" ? getToken() : "";
-        const separator = path.includes("?") ? "&" : "?";
-        return `${WS_BASE}${path}${separator}token=${encodeURIComponent(token || "")}`;
+        const wsPath = String(path).startsWith("/") ? String(path) : `/${path}`;
+        const separator = wsPath.includes("?") ? "&" : "?";
+        return `${toWebSocketUrl(WS_BASE)}${wsPath}${separator}token=${encodeURIComponent(token || "")}`;
     },
 };
 

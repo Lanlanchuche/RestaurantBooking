@@ -20,3 +20,6 @@ osmnx>=2.0
 
 # Testing
 pytest>=8.0
+
+psycopg[binary]
+bcrypt==3.2.2
