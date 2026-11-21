@@ -17,12 +17,14 @@ logging.getLogger("backend").setLevel(logging.INFO)
 
 from backend.database import engine, Base
 from backend.routers import auth_router, customer_router, restaurant_router, websocket_router
-from backend.services.email_service import email_service
+from backend.services.email_service import email_service, log_email_status
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Khởi tạo DB tables khi app startup
     Base.metadata.create_all(bind=engine)
+    # Ghi log cách gửi email đang dùng (HTTPS API / SMTP / mock) để dễ chẩn đoán khi deploy.
+    log_email_status()
     yield
     # Đợi các email đang gửi dở hoàn tất rồi dừng thread pool.
     email_service.shutdown()

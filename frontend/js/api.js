@@ -1,5 +1,33 @@
-const API_BASE = "https://restaurantbooking-flx9.onrender.com/";
-const WS_BASE = "ws://localhost:8000";
+// Địa chỉ backend khi deploy lên Render.
+// API_BASE chỉ là host (không kèm /api): mọi nơi gọi api.get/post/... truyền
+// endpoint không có prefix, vd. api.get("/customer/branches").
+const API_BASE = "https://restaurantbooking-flx9.onrender.com";
+const API_PREFIX = "/api";
+// WS_BASE tự suy ra từ API_BASE (https -> wss) nên chỉ cần đổi API_BASE một lần.
+// Render bắt buộc dùng wss:// cho websocket trên HTTPS.
+const WS_BASE = toWebSocketUrl(API_BASE);
+
+function joinUrl(base, path) {
+    if (!path) {
+        return base;
+    }
+
+    // Endpoint đã là URL tuyệt đối thì giữ nguyên.
+    if (/^https?:\/\//i.test(path)) {
+        return path;
+    }
+
+    return `${base.replace(/\/+$/, "")}/${String(path).replace(/^\/+/, "")}`;
+}
+
+function buildApiUrl(endpoint) {
+    return joinUrl(joinUrl(API_BASE, API_PREFIX), endpoint);
+}
+
+function toWebSocketUrl(url) {
+    // http -> ws, https -> wss (Render bắt buộc dùng wss trên HTTPS).
+    return url.replace(/^http/i, "ws");
+}
 
 function parseApiError(payload, fallback) {
     if (!payload) {
@@ -37,7 +65,7 @@ const api = {
 
         let response;
         try {
-            response = await fetch(`${API_BASE}${endpoint}`, {
+            response = await fetch(buildApiUrl(endpoint), {
                 ...rest,
                 headers,
                 body: body && typeof body !== "string" ? JSON.stringify(body) : body,
@@ -94,9 +122,17 @@ const api = {
     },
 
     wsUrl(path) {
+        // Router WebSocket của backend nằm ở /ws/... (không có prefix /api).
+        const base = WS_BASE || toWebSocketUrl(API_BASE);
+        let url = joinUrl(base, path);
+
+        // Đảm bảo luôn là ws:// hoặc wss:// cho new WebSocket(...).
+        url = toWebSocketUrl(url);
+
         const token = typeof getToken === "function" ? getToken() : "";
-        const separator = path.includes("?") ? "&" : "?";
-        return `${WS_BASE}${path}${separator}token=${encodeURIComponent(token || "")}`;
+        const separator = url.includes("?") ? "&" : "?";
+
+        return `${url}${separator}token=${encodeURIComponent(token || "")}`;
     },
 };
 
